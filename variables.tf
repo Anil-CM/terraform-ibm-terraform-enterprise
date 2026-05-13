@@ -229,18 +229,52 @@ variable "postgres_add_acl_rule" {
 }
 
 ##############################################################################
-# Redis
+# Redis - IBM Cloud Databases for Redis
 ##############################################################################
+
+variable "redis_instance_name" {
+  type        = string
+  description = "Name of the IBM Cloud Databases for Redis instance to create. Default to tfe-redis."
+  default     = "tfe-redis"
+}
+
+variable "redis_version" {
+  type        = string
+  description = "Version of Redis to deploy. Default to null (uses latest available version)."
+  default     = null
+}
+
+variable "redis_service_endpoints" {
+  type        = string
+  description = "Service endpoints for the Redis instance to deploy. Default is 'public-and-private'."
+  default     = "public-and-private"
+  validation {
+    condition     = contains(["private", "public-and-private"], var.redis_service_endpoints)
+    error_message = "Allowed values for var.redis_service_endpoints are 'private' and 'public-and-private'."
+  }
+}
+
+variable "redis_member_host_flavor" {
+  type        = string
+  description = "The host flavor for Redis members. Default is 'multitenant'."
+  default     = "multitenant"
+}
+
+variable "redis_deletion_protection" {
+  type        = bool
+  description = "Enable deletion protection within terraform. The Redis instance cannot be deleted by terraform when this value is set to 'true'. In order to delete with terraform the value must be set to 'false' and a terraform apply performed before the destroy is performed. The default is 'true'."
+  default     = true
+}
 
 variable "existing_redis_hostname" {
   type        = string
-  description = "Hostname of the existing redis instance to integrate with the Terraform Enterprise instance. If set to null a new redis instance is deployed in the cluster. Default to null."
+  description = "Hostname of an existing external Redis instance to integrate with the Terraform Enterprise instance. If set, the module will not create a new ICD Redis instance. Default to null."
   default     = null
 }
 
 variable "existing_redis_password_base64" {
   type        = string
-  description = "Base64 encoded password for the existing redis instance. Default to null."
+  description = "Base64 encoded password for the existing external Redis instance. Required if var.existing_redis_hostname is set. Default to null."
   default     = null
   sensitive   = true
 
@@ -252,7 +286,7 @@ variable "existing_redis_password_base64" {
 
 variable "redis_password_secret_name" {
   type        = string
-  description = "The name of the Secrets Manager secret to store the redis password if var.existing_secrets_manager_crn is not null. Default to tfe_redis_password."
+  description = "The name of the Secrets Manager secret to store the Redis password if var.existing_secrets_manager_crn is not null. Default to tfe_redis_password."
   default     = "tfe_redis_password"
   validation {
     condition     = var.existing_secrets_manager_crn == null ? true : (var.redis_password_secret_name != null && var.redis_password_secret_name != "" ? true : false)

@@ -33,10 +33,10 @@ pod:
   annotations: {}
   labels: {}
 container:
-# Configure container command
-  command: null
+# Configure container command to use custom startup script
+  command: ["/bin/sh"]
 # Configure container args as a list
-  args: null
+  args: ["-c", "/scripts/custom_tfe_start.sh"]
 # Configure pod specific security context settings
   securityContext: {}
 

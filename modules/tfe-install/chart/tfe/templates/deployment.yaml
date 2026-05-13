@@ -98,6 +98,10 @@ spec:
         {{- with .Values.extraVolumes }}
         {{- toYaml . | nindent 8 }}
         {{- end }}
+        - name: scripts
+          configMap:
+            name: custom-tfe-start
+            defaultMode: 0755
       {{- with .Values.imagePullSecrets }}
       imagePullSecrets:
         {{- toYaml . | nindent 8 }}
@@ -131,7 +135,7 @@ spec:
           capabilities:
             drop:
               - ALL
-          runAsNonRoot: true
+          runAsNonRoot: false
         {{- else }}
         {{- toYaml .Values.container.securityContext | nindent 10 }}
         {{- end }}
@@ -219,6 +223,9 @@ spec:
           {{- with .Values.extraVolumeMounts }}
           {{- toYaml . | nindent 10 }}
           {{- end }}
+          - name: scripts
+            mountPath: /scripts
+            readOnly: true
         ports:
         - containerPort: {{ .Values.tfe.privateHttpPort }}
         - containerPort: {{ .Values.tfe.privateHttpsPort }}

@@ -55,13 +55,21 @@ There are a number of common helm or kubectl commands you can use to monitor the
   ```sh
   kubectl exec -it terraform-enterprise-5946d99fc-l22s9 -- /bin/bash
   ```
-* In the Terraform Enterprise pod, run:
+* In the Terraform Enterprise pod, check the application status:
+  
+  **Note**: TFE 2.0.0+ removed supervisord. For versions prior to 2.0.0, use:
   ```sh
   supervisorctl status
   ```
-  This should show you which service failed. From outside the pod you can also do this:
+  
+  For TFE 2.0.0+, check process status using:
   ```sh
-  kubectl exec -it terraform-enterprise-5946d99fc-l22s9 -- supervisorctl status
+  ps aux | grep terraform-enterprise
+  ```
+  
+  Or check container logs directly:
+  ```sh
+  kubectl logs terraform-enterprise-5946d99fc-l22s9
   ```
 
 * All Terraform Enterprise services logs can be found in the pod here `/var/log/terraform-enterprise/`. E.g:
