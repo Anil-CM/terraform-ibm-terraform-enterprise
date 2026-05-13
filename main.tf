@@ -272,8 +272,8 @@ resource "ibm_is_security_group_rule" "vpc_kubecluster_sg_rule" {
 ########################################################################################################################
 
 module "icd_redis" {
-  source                       = "terraform-ibm-modules/icd-redis/ibm"
-  version                      = "1.8.0"
+  source  = "terraform-ibm-modules/icd-redis/ibm"
+  version = "2.10.6"
   resource_group_id            = var.resource_group_id
   name                         = var.redis_instance_name
   redis_version                = var.redis_version
