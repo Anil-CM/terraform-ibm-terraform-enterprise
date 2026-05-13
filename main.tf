@@ -282,9 +282,12 @@ module "icd_redis" {
   member_host_flavor           = var.redis_member_host_flavor
   use_ibm_owned_encryption_key = false
   kms_key_crn                  = module.key_protect_all_inclusive.keys["terraform-enterprise.terraform-enterprise-redis"].crn
-  service_credential_names = {
-    "tfe" : "Administrator"
-  }
+  service_credential_names = [
+    {
+      name = "tfe"
+      role = "Administrator"
+    }
+  ]
   deletion_protection = var.redis_deletion_protection
 }
 
@@ -335,7 +338,7 @@ locals {
 }
 
 module "tfe_install" {
-  depends_on                = [module.redis, module.icd_postgres_vpe]
+  depends_on                = [module.icd_redis, module.icd_postgres_vpe]
   source                    = "./modules/tfe-install"
   cluster_id                = module.ocp_vpc.cluster_id
   cluster_resource_group_id = var.resource_group_id
