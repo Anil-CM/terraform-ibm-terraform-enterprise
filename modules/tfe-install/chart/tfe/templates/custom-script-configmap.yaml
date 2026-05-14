@@ -10,6 +10,6 @@ metadata:
   namespace: {{ .Release.Namespace }}
 data:
   custom_tfe_start.sh: |
-{{ .Files.Get "../../scripts/custom_tfe_start.sh" | indent 4 }}
+{{ .Files.Get "scripts/custom_tfe_start.sh" | indent 4 }}
 
 # Made with Bob

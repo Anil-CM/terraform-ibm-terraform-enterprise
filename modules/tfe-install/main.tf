@@ -267,16 +267,8 @@ locals {
   set_sensitive_values_list_final = concat(local.set_sensitive_values_list, local.set_sensitive_values_list_secondary_hostname)
 }
 
-resource "kubernetes_config_map" "custom_tfe_start" {
-  metadata {
-    name      = "custom-tfe-start"
-    namespace = kubernetes_namespace_v1.tfe.metadata[0].name
-  }
-
-  data = {
-    "custom_tfe_start.sh" = file("${path.module}/scripts/custom_tfe_start.sh")
-  }
-}
+# ConfigMap is now managed by the Helm chart template
+# See: modules/tfe-install/chart/tfe/templates/custom-script-configmap.yaml
 
 locals {
   tfe_deployment_labels      = {}
