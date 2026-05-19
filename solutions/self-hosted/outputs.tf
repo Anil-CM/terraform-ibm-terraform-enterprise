@@ -83,10 +83,8 @@ output "final_acl_rules" {
   value       = module.tfe.final_acl_rules
 }
 
-output "redis_password_secret_crn" {
-  value       = module.tfe.redis_password_secret_crn
-  description = "The CRN of the secret containing the redis admin password"
-}
+# Redis password is auto-generated and managed by Bitnami Redis Helm chart
+# No longer stored in Secrets Manager
 
 output "tfe_secondary_hostname_fqdn" {
   description = "The FQDN for the Terraform Enterprise secondary hostname. Null if no secondary hostname is created"

@@ -268,42 +268,24 @@ resource "ibm_is_security_group_rule" "vpc_kubecluster_sg_rule" {
 ########################################################################################################################
 
 module "redis" {
-  source     = "./modules/redis"
-  cluster_id = module.ocp_vpc.cluster_id
-  namespace  = var.tfe_namespace
+  source    = "./modules/redis"
+  namespace = var.tfe_namespace
   
   # Redis 7.2.4 for TFE compatibility
   redis_version = "7.2.4-debian-12-r9"
   
-  # Production configuration
-  enable_persistence = true
-  storage_size       = "10Gi"
+  # Production configuration with persistence
+  persistence_enabled = true
+  persistence_size    = "10Gi"
   
   # High availability with replicas
   replica_count = 1
   
-  # Resource limits
-  master_resources = {
-    requests = {
-      memory = "256Mi"
-      cpu    = "100m"
-    }
-    limits = {
-      memory = "512Mi"
-      cpu    = "500m"
-    }
-  }
-  
-  replica_resources = {
-    requests = {
-      memory = "256Mi"
-      cpu    = "100m"
-    }
-    limits = {
-      memory = "512Mi"
-      cpu    = "500m"
-    }
-  }
+  # Master resource limits
+  master_memory_request = "256Mi"
+  master_cpu_request    = "250m"
+  master_memory_limit   = "512Mi"
+  master_cpu_limit      = "500m"
 }
 
 locals {
@@ -437,18 +419,8 @@ locals {
   secret_group_id = var.existing_secrets_manager_crn == null ? null : var.existing_secrets_manager_secret_group_id != null ? var.existing_secrets_manager_secret_group_id : module.secrets_manager_secret_group[0].secret_group_id
 }
 
-module "redis_password_secret" {
-  count                   = var.existing_secrets_manager_crn != null ? 1 : 0
-  source                  = "terraform-ibm-modules/secrets-manager-secret/ibm"
-  version                 = "1.10.0"
-  region                  = module.existing_secrets_manager_crn[0].region
-  secrets_manager_guid    = module.existing_secrets_manager_crn[0].service_instance
-  secret_group_id         = local.secret_group_id
-  secret_name             = var.redis_password_secret_name
-  secret_description      = "Password for the Terraform Enterprise redis instance."
-  secret_type             = "arbitrary"
-  secret_payload_password = local.redis_pass_base64
-}
+# Redis password is auto-generated and managed by the Bitnami Redis Helm chart
+# No need to store it in Secrets Manager
 
 
 ########################################################################################################################

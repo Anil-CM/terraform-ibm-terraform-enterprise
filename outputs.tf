@@ -74,10 +74,8 @@ output "tfe_hostname" {
   description = "The hostname for Terraform Enterprise instance"
 }
 
-output "redis_password_secret_crn" {
-  value       = var.existing_secrets_manager_crn != null ? module.redis_password_secret[0].secret_crn : null
-  description = "The CRN of the secret containing the redis admin password"
-}
+# Redis password is auto-generated and managed by Bitnami Redis Helm chart
+# No longer stored in Secrets Manager
 
 output "final_acl_rules" {
   description = "The final set of ACL rules applied to the VPC, including any rules added for Postgres connectivity."

@@ -17,107 +17,53 @@ resource "helm_release" "redis_install" {
   reset_values     = true
   atomic           = true
 
-  # Redis 7.x configuration
-  set {
-    name  = "image.tag"
-    value = var.redis_version
-  }
-
-  # Authentication
-  set {
-    name  = "auth.enabled"
-    value = "true"
-  }
-
-  set_sensitive {
-    name  = "auth.password"
-    value = var.redis_password != null ? var.redis_password : random_password.redis_password[0].result
-  }
-
-  # Persistence
-  set {
-    name  = "master.persistence.enabled"
-    value = var.persistence_enabled
-  }
-
-  set {
-    name  = "master.persistence.size"
-    value = var.persistence_size
-  }
-
-  set {
-    name  = "master.persistence.storageClass"
-    value = var.storage_class
-  }
-
-  # Resources
-  set {
-    name  = "master.resources.requests.memory"
-    value = var.master_memory_request
-  }
-
-  set {
-    name  = "master.resources.requests.cpu"
-    value = var.master_cpu_request
-  }
-
-  set {
-    name  = "master.resources.limits.memory"
-    value = var.master_memory_limit
-  }
-
-  set {
-    name  = "master.resources.limits.cpu"
-    value = var.master_cpu_limit
-  }
-
-  # High Availability (optional)
-  set {
-    name  = "replica.replicaCount"
-    value = var.replica_count
-  }
-
-  set {
-    name  = "replica.persistence.enabled"
-    value = var.persistence_enabled
-  }
-
-  set {
-    name  = "replica.persistence.size"
-    value = var.persistence_size
-  }
-
-  # Metrics (optional)
-  set {
-    name  = "metrics.enabled"
-    value = var.metrics_enabled
-  }
-
-  # Security Context for OpenShift
-  set {
-    name  = "master.podSecurityContext.enabled"
-    value = "true"
-  }
-
-  set {
-    name  = "master.podSecurityContext.fsGroup"
-    value = "1001"
-  }
-
-  set {
-    name  = "master.containerSecurityContext.enabled"
-    value = "true"
-  }
-
-  set {
-    name  = "master.containerSecurityContext.runAsUser"
-    value = "1001"
-  }
-
-  set {
-    name  = "master.containerSecurityContext.runAsNonRoot"
-    value = "true"
-  }
+  values = [
+    yamlencode({
+      image = {
+        tag = var.redis_version
+      }
+      auth = {
+        enabled  = true
+        password = var.redis_password != null ? var.redis_password : random_password.redis_password[0].result
+      }
+      master = {
+        persistence = {
+          enabled      = var.persistence_enabled
+          size         = var.persistence_size
+          storageClass = var.storage_class
+        }
+        resources = {
+          requests = {
+            memory = var.master_memory_request
+            cpu    = var.master_cpu_request
+          }
+          limits = {
+            memory = var.master_memory_limit
+            cpu    = var.master_cpu_limit
+          }
+        }
+        podSecurityContext = {
+          enabled = true
+          fsGroup = 1001
+        }
+        containerSecurityContext = {
+          enabled      = true
+          runAsUser    = 1001
+          runAsNonRoot = true
+        }
+      }
+      replica = {
+        replicaCount = var.replica_count
+        persistence = {
+          enabled = var.persistence_enabled
+          size    = var.persistence_size
+        }
+      }
+      metrics = {
+        enabled = var.metrics_enabled
+      }
+    })
+  ]
 }
 
 # Generate random password if not provided
