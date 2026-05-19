@@ -32,10 +32,6 @@ module "key_protect_all_inclusive" {
           force_delete = local.force_delete
         },
         {
-          key_name     = "terraform-enterprise-redis"
-          force_delete = local.force_delete
-        },
-        {
           key_name     = "terraform-enterprise-vsi-volume-key"
           force_delete = local.force_delete
         }
@@ -268,33 +264,52 @@ resource "ibm_is_security_group_rule" "vpc_kubecluster_sg_rule" {
 }
 
 ########################################################################################################################
-# Redis - IBM Cloud Databases for Redis
+# Redis - In-Cluster Bitnami Redis
 ########################################################################################################################
 
-module "icd_redis" {
-  source  = "terraform-ibm-modules/icd-redis/ibm"
-  version = "2.10.6"
-  resource_group_id            = var.resource_group_id
-  name                         = var.redis_instance_name
-  redis_version                = var.redis_version
-  region                       = var.region
-  service_endpoints            = var.redis_service_endpoints
-  member_host_flavor           = var.redis_member_host_flavor
-  use_ibm_owned_encryption_key = false
-  kms_key_crn                  = module.key_protect_all_inclusive.keys["terraform-enterprise.terraform-enterprise-redis"].crn
-  service_credential_names = [
-    {
-      name = "tfe"
-      role = "Administrator"
+module "redis" {
+  source     = "./modules/redis"
+  cluster_id = module.ocp_vpc.cluster_id
+  namespace  = var.tfe_namespace
+  
+  # Redis 7.2.4 for TFE compatibility
+  redis_version = "7.2.4-debian-12-r9"
+  
+  # Production configuration
+  enable_persistence = true
+  storage_size       = "10Gi"
+  
+  # High availability with replicas
+  replica_count = 1
+  
+  # Resource limits
+  master_resources = {
+    requests = {
+      memory = "256Mi"
+      cpu    = "100m"
     }
-  ]
-  deletion_protection = var.redis_deletion_protection
+    limits = {
+      memory = "512Mi"
+      cpu    = "500m"
+    }
+  }
+  
+  replica_resources = {
+    requests = {
+      memory = "256Mi"
+      cpu    = "100m"
+    }
+    limits = {
+      memory = "512Mi"
+      cpu    = "500m"
+    }
+  }
 }
 
 locals {
-  redis_host        = var.existing_redis_hostname != null ? var.existing_redis_hostname : module.icd_redis.hostname
-  redis_pass_base64 = var.existing_redis_password_base64 != null ? var.existing_redis_password_base64 : base64encode(module.icd_redis.service_credentials_object.credentials["tfe"].password)
-  redis_port        = module.icd_redis.port
+  redis_host        = var.existing_redis_hostname != null ? var.existing_redis_hostname : module.redis.redis_host
+  redis_pass_base64 = var.existing_redis_password_base64 != null ? var.existing_redis_password_base64 : base64encode(module.redis.redis_password)
+  redis_port        = 6379
 }
 
 ########################################################################################################################
@@ -338,7 +353,7 @@ locals {
 }
 
 module "tfe_install" {
-  depends_on                = [module.icd_redis, module.icd_postgres_vpe]
+  depends_on                = [module.redis, module.icd_postgres_vpe]
   source                    = "./modules/tfe-install"
   cluster_id                = module.ocp_vpc.cluster_id
   cluster_resource_group_id = var.resource_group_id

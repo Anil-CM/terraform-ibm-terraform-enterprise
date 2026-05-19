@@ -355,28 +355,10 @@ resource "helm_release" "tfe_install" {
       "tlsRedis"        = null,
       "tlsRedisSidekiq" = null,
       "container" = {
-        "command" = ["/bin/sh"],
-        "args"    = ["-c", "/scripts/custom_tfe_start.sh"],
         "securityContext" = {
           "runAsUser" = 1000
         }
       },
-      "extraVolumes" = [
-        {
-          "configMap" = {
-            "defaultMode" = 488
-            "name"        = "custom-tfe-start"
-          }
-          "name" = "scripts"
-        }
-      ],
-      "extraVolumeMounts" = [
-        {
-          "mountPath" = "/scripts"
-          "name"      = "scripts"
-          "readOnly"  = true
-        }
-      ]
       "service"          = local.tfe_service_values,
       "serviceSecondary" = local.tfe_service_secondary_values,
       "serviceAccount"   = local.tfe_service_account,
