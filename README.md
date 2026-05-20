@@ -32,7 +32,6 @@ You need the following permissions to run this module:
 - IBM Cloud OpenShift: `Editor` or `Administrator` access to the cluster
 - IBM Cloud Object Storage: `Manager` or `Writer` access for the S3 bucket
 - IBM Cloud Databases for PostgreSQL: `Manager` or equivalent access
-- IBM Cloud Databases for Redis: `Manager` or equivalent access
 - IBM Cloud Key Protect: `Manager` access for encryption key management
 - IBM Cloud Secrets Manager: `Writer` access if the generated secrets are to be stored in Secrets Manager
 - IBM Cloud Secrets Manager: `SecretsReader` access if the Terraform Enterprise license key is in Secrets Manager
@@ -46,15 +45,19 @@ To set up your local development environment, see [Local development setup](http
 
 ## Notes
 
-### IBM Cloud Databases for Redis
-This module now uses IBM Cloud Databases for Redis instead of an in-cluster Redis deployment. The Redis instance is:
-- Encrypted at rest using IBM Key Protect
-- Configured with service endpoints (public-and-private by default)
-- Managed as a fully-managed IBM Cloud service
-- Automatically backed up and highly available
+### In-Cluster Redis Deployment
+This module uses an in-cluster Bitnami Redis deployment (Redis 7.2.4) instead of IBM Cloud Databases for Redis. This provides:
+- **TFE Compatibility**: Redis 7.2.4 is fully compatible with Terraform Enterprise 2.0.0
+- **Lower Latency**: Redis runs in the same OpenShift cluster as TFE (no external network calls)
+- **Cost Savings**: No separate IBM Cloud Databases charges
+- **Simpler Architecture**: Everything managed within the cluster
+- **High Availability**: Configurable with master-replica setup
+- **Persistent Storage**: Data persisted using Kubernetes PVCs
 
 ### Secrets Manager Integration
-The module integrates with IBM Cloud Secret Manager service. This integration takes two forms. If an optional IBM Cloud Secrets Manager instance CRN and secret group ID are provided, then the Redis admin user password and Terraform Enterprise admin token will be stored in Secrets Manager and the new secret CRNs will be returned instead of the secret values. If an optional Terraform Enterprise license secret CRN is provided, then the license will be retrieved from Secrets Manager, avoiding the need to pass the license key as a string.
+The module integrates with IBM Cloud Secret Manager service. If an optional IBM Cloud Secrets Manager instance CRN and secret group ID are provided, then the Terraform Enterprise admin token will be stored in Secrets Manager and the new secret CRN will be returned instead of the secret value. If an optional Terraform Enterprise license secret CRN is provided, then the license will be retrieved from Secrets Manager, avoiding the need to pass the license key as a string.
+
+Note: Redis passwords are auto-generated and managed within the cluster by the Bitnami Redis Helm chart.
 
 ## Known issues
 

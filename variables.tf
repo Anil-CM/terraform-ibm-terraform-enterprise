@@ -232,6 +232,27 @@ variable "postgres_add_acl_rule" {
 # Redis - IBM Cloud Databases for Redis
 ##############################################################################
 
+variable "redis_instance_name" {
+  type        = string
+  description = "Name of Redis instance to create. Default set to be `tfe-redis`"
+  default     = "tfe-redis"
+}
+
+variable "redis_deletion_protection" {
+  type        = bool
+  description = "Enable deletion protection within terraform. This is not a property of the resource and does not prevent deletion outside of terraform. The database can not be deleted by terraform when this value is set to 'true'. In order to delete with terraform the value must be set to 'false' and a terraform apply performed before the destroy is performed. The default is 'true'."
+  default     = true
+}
+
+variable "redis_service_endpoints" {
+  description = "Service endpoints for the Redis instance to deploy. Default is `public-and-private`"
+  default     = "public-and-private"
+  type        = string
+  validation {
+    condition     = contains(["private", "public-and-private"], var.redis_service_endpoints)
+    error_message = "Allowed values for var.redis_service_endpoints are 'private' and 'public-and-private'"
+  }
+}
 
 variable "existing_redis_hostname" {
   type        = string
@@ -249,6 +270,12 @@ variable "existing_redis_password_base64" {
     condition     = var.existing_redis_hostname != null ? var.existing_redis_password_base64 != null : true
     error_message = "If var.existing_redis_hostname is set, var.existing_redis_password_base64 must also be set."
   }
+}
+
+variable "existing_redis_port" {
+  type        = number
+  description = "Port of an existing external Redis instance. Default is 6379."
+  default     = null
 }
 
 
