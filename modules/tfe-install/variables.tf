@@ -72,7 +72,7 @@ variable "tfe_license" {
 variable "tfe_image_tag" {
   description = "The version tag of the Terraform Enterprise image to use"
   type        = string
-  default     = "v2.0.1"
+  default     = "2.0.1"
 }
 
 variable "tfe_encryption_password" {
@@ -139,8 +139,27 @@ variable "tfe_redis_host" {
   type        = string
 }
 
+variable "tfe_redis_port" {
+  description = "The Redis port for Terraform Enterprise"
+  type        = number
+}
+
+variable "tfe_redis_user" {
+  description = "The Redis username for Terraform Enterprise"
+  type        = string
+  default     = ""
+  sensitive   = true
+}
+
 variable "tfe_redis_password" {
-  description = "The Redis password for Terraform Enterprise"
+  description = "The base64-encoded Redis password for Terraform Enterprise"
+  type        = string
+  default     = ""
+  sensitive   = true
+}
+
+variable "tfe_redis_ca_cert" {
+  description = "The base64-encoded CA certificate for Redis TLS connection"
   type        = string
   default     = ""
   sensitive   = true

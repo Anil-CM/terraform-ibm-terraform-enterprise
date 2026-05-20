@@ -39,6 +39,21 @@ resource "kubernetes_secret_v1" "tfe_pull_secret" {
   }
 }
 
+resource "kubernetes_secret_v1" "redis_ca_cert" {
+  count = var.tfe_redis_ca_cert != "" ? 1 : 0
+
+  metadata {
+    name      = "redis-ca-cert"
+    namespace = kubernetes_namespace_v1.tfe.metadata[0].name
+  }
+
+  type = "Opaque"
+
+  data = {
+    "ca.crt" = base64decode(var.tfe_redis_ca_cert)
+  }
+}
+
 locals {
   tfe_deployment_replicas = var.tfe_deployment_replicas != null ? var.tfe_deployment_replicas : 3
   route_name              = "tfe"
@@ -124,11 +139,11 @@ locals {
     },
     {
       name  = "env.variables.TFE_REDIS_USE_TLS"
-      value = false
+      value = true
     },
     {
       name  = "env.variables.TFE_REDIS_HOST"
-      value = var.tfe_redis_host
+      value = "${var.tfe_redis_host}:${var.tfe_redis_port}"
     },
     {
       name  = "env.variables.TFE_OBJECT_STORAGE_S3_REGION"
@@ -206,15 +221,10 @@ locals {
       name  = "tlsSecondary.certificateSecret"
       value = var.tfe_secondary_hostname_secret_name
     }
-    ] : [
-    {
-      name  = "tlsSecondary"
-      value = null
-    }
-  ]
+    ] : []
 
   # concatenating values for the final list
-  set_values_list_final = concat(local.set_values_list, local.set_values_list_secondary_hostname)
+  set_values_list_final = concat(local.set_values_list, local.set_values_list_secondary_hostname, local.set_values_list_redis_ca)
 
   # building the list of sensitive values
   set_sensitive_values_list = [
@@ -235,8 +245,12 @@ locals {
       value = var.tfe_database_password
     },
     {
+      name  = "env.secrets.TFE_REDIS_USER"
+      value = var.tfe_redis_user
+    },
+    {
       name  = "env.secrets.TFE_REDIS_PASSWORD"
-      value = var.tfe_redis_password
+      value = base64decode(var.tfe_redis_password)
     },
     {
       name  = "env.variables.TFE_OBJECT_STORAGE_S3_ACCESS_KEY_ID"
@@ -252,6 +266,26 @@ locals {
     },
   ]
 
+  # building the list of sensitive values for Redis TLS CA certificate
+  set_sensitive_values_list_redis_ca = var.tfe_redis_ca_cert != "" ? [
+    {
+      name  = "tlsRedis.caCertData"
+      value = var.tfe_redis_ca_cert
+    },
+    {
+      name  = "tlsRedis.caCertMountPath"
+      value = "/etc/ssl/certs/redis-ca.crt"
+    }
+  ] : []
+
+  # building the list of values for Redis TLS CA certificate path
+  set_values_list_redis_ca = var.tfe_redis_ca_cert != "" ? [
+    {
+      name  = "env.variables.TFE_REDIS_CA_FILE"
+      value = "/etc/ssl/certs/redis-ca.crt"
+    }
+  ] : []
+
   # building the list of sensitive values if a secondary TFE hostname is to be configured
   set_sensitive_values_list_secondary_hostname = var.tfe_secondary_hostname_certificate != null && var.tfe_secondary_hostname_key != null ? [
     {
@@ -264,7 +298,7 @@ locals {
   }] : []
 
   # concatenating sensitive values for the final list
-  set_sensitive_values_list_final = concat(local.set_sensitive_values_list, local.set_sensitive_values_list_secondary_hostname)
+  set_sensitive_values_list_final = concat(local.set_sensitive_values_list, local.set_sensitive_values_list_secondary_hostname, local.set_sensitive_values_list_redis_ca)
 }
 
 # ConfigMap is now managed by the Helm chart template
@@ -351,19 +385,15 @@ resource "helm_release" "tfe_install" {
         "labels"      = local.tfe_deployment_labels,
         "annotations" = local.tfe_deployment_annotations
       },
-      "adminHttpsPort"  = null,
-      "tlsRedis"        = null,
-      "tlsRedisSidekiq" = null,
       "container" = {
         "securityContext" = {
           "runAsUser" = 1000
         }
       },
-      "service"          = local.tfe_service_values,
-      "serviceSecondary" = local.tfe_service_secondary_values,
-      "serviceAccount"   = local.tfe_service_account,
-      "resources"        = local.tfe_resources_configuration,
-      "secret"           = local.tfe_secret,
+      "service"        = local.tfe_service_values,
+      "serviceAccount" = local.tfe_service_account,
+      "resources"      = local.tfe_resources_configuration,
+      "secret"         = local.tfe_secret,
     }),
   ]
 }

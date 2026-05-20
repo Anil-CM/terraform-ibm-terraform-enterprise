@@ -294,6 +294,7 @@ module "icd_redis" {
 
 locals {
   redis_host        = var.existing_redis_hostname != null ? var.existing_redis_hostname : module.icd_redis.hostname
+  redis_user        = var.existing_redis_hostname != null ? var.existing_redis_username : module.icd_redis.service_credentials_object.credentials["tfe"].username
   redis_pass_base64 = var.existing_redis_password_base64 != null ? var.existing_redis_password_base64 : base64encode(module.icd_redis.service_credentials_object.credentials["tfe"].password)
   redis_port        = var.existing_redis_port != null ? var.existing_redis_port : module.icd_redis.port
 }
@@ -345,6 +346,7 @@ module "tfe_install" {
   cluster_resource_group_id = var.resource_group_id
   namespace                 = var.tfe_namespace
   tfe_license               = local.tfe_license
+  tfe_image_tag             = var.tfe_image_tag
   tfe_database_host         = "${local.icd_postgres_hostname}:${local.icd_postgres_port}"
   tfe_database_user         = module.icd_postgres.service_credentials_object.credentials["tfe"].username
   tfe_database_password     = module.icd_postgres.service_credentials_object.credentials["tfe"].password
@@ -355,8 +357,11 @@ module "tfe_install" {
   tfe_s3_secret_key = module.cos.resource_keys["tfe-credentials"].credentials["cos_hmac_keys.secret_access_key"]
   tfe_s3_endpoint   = module.cos.s3_endpoint_public
 
-  tfe_redis_host     = local.redis_host
-  tfe_redis_password = local.redis_pass_base64
+  tfe_redis_host        = local.redis_host
+  tfe_redis_port        = local.redis_port
+  tfe_redis_user        = local.redis_user
+  tfe_redis_password    = local.redis_pass_base64
+  tfe_redis_ca_cert     = module.icd_redis.certificate_base64
 
   admin_username = var.admin_username
   admin_password = var.admin_password

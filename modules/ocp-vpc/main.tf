@@ -111,7 +111,8 @@ locals {
 }
 
 locals {
-  cluster_security_group = [for group in data.ibm_is_security_groups.vpc_security_groups.security_groups : group if group.name == "kube-${local.cluster_id}"][0]
+  cluster_security_group_list = [for group in data.ibm_is_security_groups.vpc_security_groups.security_groups : group if group.name == "kube-${local.cluster_id}"]
+  cluster_security_group = length(local.cluster_security_group_list) > 0 ? local.cluster_security_group_list[0] : null
 }
 
 data "ibm_is_security_groups" "vpc_security_groups" {

@@ -78,6 +78,10 @@ spec:
         - name: certificates-redis
           secret:
             secretName: {{ .Values.tlsRedis.certificateSecret | default "terraform-enterprise-certificates-redis" }}
+        {{- else if .Values.tlsRedis.caCertData }}
+        - name: certificates-redis-ca
+          secret:
+            secretName: redis-ca-cert
         {{- end }}
         {{- end }}
         {{- if .Values.tlsRedisSidekiq }}
@@ -95,6 +99,10 @@ spec:
             volumeAttributes:
               secretProviderClass: "{{ .Values.csi.secretProviderClass }}"
         {{- end }}
+        - name: custom-script
+          configMap:
+            name: custom-tfe-start
+            defaultMode: 0755
         {{- with .Values.extraVolumes }}
         {{- toYaml . | nindent 8 }}
         {{- end }}
@@ -196,6 +204,10 @@ spec:
           - name: certificates-redis
             mountPath: {{ .Values.tlsRedis.caCertMountPath }}
             subPath: tls.ca
+          {{- else if .Values.tlsRedis.caCertData }}
+          - name: certificates-redis-ca
+            mountPath: {{ .Values.tlsRedis.caCertMountPath }}
+            subPath: ca.crt
           {{- end }}
           {{- end }}
           {{- if and .Values.tlsRedisSidekiq }}
@@ -216,6 +228,9 @@ spec:
             mountPath: "{{ .Values.csi.mountPath }}"
             readOnly: true
           {{- end }}
+          - name: custom-script
+            mountPath: /scripts
+            readOnly: true
           {{- with .Values.extraVolumeMounts }}
           {{- toYaml . | nindent 10 }}
           {{- end }}

@@ -2,6 +2,12 @@
 # Input Variables
 ########################################################################################################################
 
+variable "ibmcloud_api_key" {
+  type        = string
+  description = "The IBM Cloud API key"
+  sensitive   = true
+}
+
 variable "region" {
   type        = string
   description = "Region where resources are created"
@@ -79,6 +85,12 @@ variable "tfe_namespace" {
   type        = string
   description = "namespace to place Terraform Enterprise in on cluster"
   default     = "tfe"
+}
+
+variable "tfe_image_tag" {
+  type        = string
+  description = "The version tag of the Terraform Enterprise image to use"
+  default     = "2.0.1"
 }
 
 variable "tfe_organization" {
@@ -258,6 +270,18 @@ variable "existing_redis_hostname" {
   type        = string
   description = "Hostname of an existing external Redis instance to integrate with the Terraform Enterprise instance. If set, the module will not create a new ICD Redis instance. Default to null."
   default     = null
+}
+
+variable "existing_redis_username" {
+  type        = string
+  description = "Username for the existing external Redis instance. Required if var.existing_redis_hostname is set. Default to null."
+  default     = null
+  sensitive   = true
+
+  validation {
+    condition     = var.existing_redis_hostname != null ? var.existing_redis_username != null : true
+    error_message = "If var.existing_redis_hostname is set, var.existing_redis_username must also be set."
+  }
 }
 
 variable "existing_redis_password_base64" {
