@@ -155,7 +155,7 @@ locals {
     },
     {
       name  = "env.variables.TFE_OBJECT_STORAGE_S3_ENDPOINT"
-      value = var.tfe_s3_endpoint
+      value = "https://${var.tfe_s3_endpoint}"
     },
     {
       name  = "env.variables.TFE_RUN_PIPELINE_IMAGE"
@@ -164,6 +164,18 @@ locals {
     {
       name  = "env.variables.TFE_OBJECT_STORAGE_S3_USE_INSTANCE_PROFILE"
       value = false
+    },
+    {
+      name  = "env.variables.TFE_OBJECT_STORAGE_S3_SERVER_SIDE_ENCRYPTION"
+      value = "none"
+    },
+    {
+      name  = "env.variables.TFE_OBJECT_STORAGE_S3_SERVER_SIDE_ENCRYPTION_KMS_KEY_ID"
+      value = ""
+    },
+    {
+      name  = "env.variables.TFE_OBJECT_STORAGE_S3_USE_PATH_STYLE"
+      value = true
     },
     {
       name  = "env.variables.TFE_RUN_PIPELINE_KUBERNETES_NAMESPACE"
@@ -237,6 +249,10 @@ locals {
       value = var.tfe_encryption_password
     },
     {
+      name  = "env.secrets.TFE_OBJECT_STORAGE_S3_ACCESS_KEY_ID"
+      value = var.tfe_s3_access_key
+    },
+    {
       name  = "env.secrets.TFE_OBJECT_STORAGE_S3_SECRET_ACCESS_KEY"
       value = var.tfe_s3_secret_key
     },
@@ -251,10 +267,6 @@ locals {
     {
       name  = "env.secrets.TFE_REDIS_PASSWORD"
       value = base64decode(var.tfe_redis_password)
-    },
-    {
-      name  = "env.variables.TFE_OBJECT_STORAGE_S3_ACCESS_KEY_ID"
-      value = var.tfe_s3_access_key
     },
     {
       name  = "env.variables.TFE_RUN_PIPELINE_KUBERNETES_POD_TEMPLATE"
@@ -386,6 +398,8 @@ resource "helm_release" "tfe_install" {
         "annotations" = local.tfe_deployment_annotations
       },
       "container" = {
+        "command" = ["/bin/bash"]
+        "args"    = ["-c", "/scripts/custom_tfe_start.sh"]
         "securityContext" = {
           "runAsUser" = 1000
         }
