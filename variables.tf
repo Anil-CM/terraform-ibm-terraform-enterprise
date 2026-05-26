@@ -35,6 +35,11 @@ variable "tfe_license" {
   sensitive   = true
 }
 
+variable "tfe_image_tag" {
+  type        = string
+  description = "The version tag of the Terraform Enterprise image to use"
+}
+
 variable "tfe_license_secret_crn" {
   type        = string
   description = "The CRN of the Secrets Manager secret containing the license key for Terraform Enterprise"
