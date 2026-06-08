@@ -19,9 +19,10 @@
       ],
       "keywords": [
         "terraform",
-        "tfe"
+        "terraform-enterprise",
+        "infrastructure-as-code"
       ],
-      "short_description": "Automate Terraform HashiCorp Enterprise deployment with supporting IBM Cloud services.",
+      "short_description": "Automate Terraform Enterprise deployment with supporting IBM Cloud services.",
       "long_description": "Leverage [Terraform IBM Modules](https://github.com/terraform-ibm-modules) to shape and scale your solutions. You can integrate Terraform IBM Modules (TIM) to extend functionality and design a solution tailored to your environment and operations needs. These modules offer reusable, customizable elements that follow IBM Cloud's recommended practices. You can access the [source code and documentation](https://github.com/terraform-ibm-modules/terraform-ibm-terraform-enterprise) and use it to extend your current architecture or create new solutions.\n\nThis solution provides a fully automated, deployment of Terraform Enterprise (TFE) on IBM Cloud. Designed for scalability, security, and ease of use, it provisions all necessary cloud resources—including VPC, Cloud Object Storage, PostgreSQL, and Redis—within a managed and customizable infrastructure.\n\nIdeal for: DevOps teams, cloud architects, and platform engineers looking to streamline Terraform Enterprise setup on IBM Cloud with infrastructure-as-code best practices.",
       "offering_docs_url": "https://cloud.ibm.com/docs/ibm-cloud-provider-for-terraform?topic=ibm-cloud-provider-for-terraform-about-tim",
       "offering_icon_url": "https://cdn.worldvectorlogo.com/logos/terraform-enterprise.svg",
@@ -36,15 +37,15 @@
         },
         {
           "title": "Secure PostgreSQL Backend",
-          "description": "Provisions a managed PostgreSQL instance with service credentials for TFE."
+          "description": "Provisions a managed IBM Cloud Databases for PostgreSQL instance with service credentials for Terraform Enterprise."
         },
         {
           "title": "Redis Caching Layer",
-          "description": "Deploys Redis for TFE session and queue management."
+          "description": "Deploys IBM Cloud Databases for Redis for Terraform Enterprise session and queue management."
         },
         {
-          "title": "OpenShift VPC Integration",
-          "description": "Sets up a VPC tailored for OpenShift clusters, supporting TFE deployment."
+          "title": "OpenShift and Kubernetes VPC Integration",
+          "description": "Sets up a VPC tailored for OpenShift or Kubernetes clusters, supporting Terraform Enterprise deployment."
         },
         {
           "title": "Customizable and Reusable",
@@ -61,10 +62,10 @@
       ],
       "flavors": [
         {
-          "label": "Click & Go",
+          "label": "Standard Deployment",
           "name": "self-hosted",
           "working_directory": "solutions/self-hosted",
-          "short_description": "Ideal for users who want to self host Terraform Enterprise in a multi-zone reslient virtual private cloud",
+          "short_description": "Production-ready Terraform Enterprise deployment in a multi-zone resilient virtual private cloud with comprehensive security and scalability features",
           "licenses": [],
           "iam_permissions": [
             {
@@ -169,11 +170,11 @@
             "features": [
               {
                 "title": "Minimal Inputs Required",
-                "description": "Just provide a few key values—like region, admin credentials, and a name for the instance the automation takes care of the rest."
+                "description": "Just provide a few key values—like region, admin credentials, and instance name—the automation takes care of the rest."
               },
               {
-                "title": "Lightweight OpenShift Cluster",
-                "description": "Deploys a minimally sized OpenShift cluster, optimized for fast provisioning and cost efficiency"
+                "title": "Flexible Cluster Options",
+                "description": "Supports both Red Hat OpenShift and IBM Cloud Kubernetes Service (IKS) clusters, with configurable sizing options. Can also use existing clusters or skip cluster creation for infrastructure-only deployments."
               },
               {
                 "title": "Unrestricted Network Configuration",
@@ -196,7 +197,7 @@
                   "type": "image/svg+xml",
                   "thumbnail_url": "https://raw.githubusercontent.com/terraform-ibm-modules/terraform-ibm-terraform-enterprise/main/reference-architectures/diagram-quick-start.svg"
                 },
-                "description": "This architecture automates the deployment of Terraform Enterprise (TFE) on a small 2-node OpenShift cluster, with supporting services and relaxed network settings for full outbound internet access.\n- Custom TFE Agent Image: Built with kubectl, oc, and soon ibmcloud CLI, stored in the OpenShift image registry and backed by a COS bucket.\n- PostgreSQL via ICD: Uses a lightweight, multi-tenant ICD Postgres instance with minimal configuration.\nRedis: Deploys a Redis instance on-cluster, with plans to migrate to ICD Redis.\n- TFE Admin Setup: Automatically configures the default admin account post-deployment."
+                "description": "This architecture automates the deployment of Terraform Enterprise on OpenShift or Kubernetes clusters with supporting IBM Cloud services:\n\n**Core Components:**\n- **Terraform Enterprise**: Deployed via official Helm chart with configurable version\n- **PostgreSQL**: IBM Cloud Databases for PostgreSQL with encryption and automated backups\n- **Redis**: IBM Cloud Databases for Redis for session and queue management\n- **Object Storage**: IBM Cloud Object Storage (COS) for state files and artifacts\n- **Key Management**: IBM Key Protect for encryption key management\n\n**Cluster Support:**\n- Red Hat OpenShift on IBM Cloud (recommended for enterprise features)\n- IBM Cloud Kubernetes Service (IKS) for cost-effective deployments\n\n**Sizing Options:**\n- Small: 2-node cluster, suitable for development and testing\n- Medium: 3-node cluster, suitable for small production workloads\n- Large: 5+ node cluster, suitable for enterprise production workloads\n- Custom: Fully configurable cluster size and worker node specifications\n\n**Security Features:**\n- End-to-end encryption with IBM Key Protect\n- Private network connectivity via VPE gateways\n- Configurable network ACLs and security groups\n- Secrets management via IBM Secrets Manager integration\n\n**Automated Setup:**\n- Admin account configuration\n- Organization creation\n- TLS certificate management\n- Optional secondary hostname configuration"
               }
             ]
           },
@@ -251,6 +252,16 @@
               "virtual": false
             },
             {
+              "key": "tfe_image_tag",
+              "required": true,
+              "virtual": false
+            },
+            {
+              "key": "helm_chart_version",
+              "required": true,
+              "virtual": false
+            },
+            {
               "key": "admin_username",
               "required": true,
               "virtual": false
@@ -279,9 +290,55 @@
               "default_value": "Default"
             },
             {
+              "key": "deployment_size",
+              "required": false,
+              "default_value": "small",
+              "options": [
+                {
+                  "displayname": "Small (Development/Testing) - ~$500-800/month",
+                  "value": "small"
+                },
+                {
+                  "displayname": "Medium (Small Production) - ~$1200-1800/month",
+                  "value": "medium"
+                },
+                {
+                  "displayname": "Large (Enterprise Production) - ~$2500-3500/month",
+                  "value": "large"
+                },
+                {
+                  "displayname": "Custom (Configure manually)",
+                  "value": "custom"
+                }
+              ],
+              "virtual": false
+            },
+            {
               "key": "tfe_organization_name",
               "required": false,
               "virtual": false
+            },
+            {
+              "key": "existing_vpc_id",
+              "description": "The ID of an existing VPC to use. If not provided, a new VPC will be created.",
+              "required": false,
+              "virtual": false,
+              "custom_config": {
+                "type": "string",
+                "grouping": "deployment",
+                "original_grouping": "deployment"
+              }
+            },
+            {
+              "key": "existing_cluster_id",
+              "description": "The ID of an existing OpenShift cluster to use. If not provided, a new cluster will be created.",
+              "required": false,
+              "virtual": false,
+              "custom_config": {
+                "type": "string",
+                "grouping": "deployment",
+                "original_grouping": "deployment"
+              }
             },
             {
               "key": "add_to_catalog",
@@ -444,22 +501,40 @@
           "terraform_version": "1.12.2",
           "outputs": [
             {
-              "key": "tfe_console_url"
+              "key": "tfe_console_url",
+              "description": "URL to access Terraform Enterprise. Null if TFE is not installed."
             },
             {
-              "key": "tfe_hostname"
+              "key": "tfe_hostname",
+              "description": "The hostname for Terraform Enterprise instance. Null if TFE is not installed."
             },
             {
               "key": "cos_instance_id"
             },
             {
-              "key": "cluster_id"
+              "key": "cluster_id",
+              "description": "The ID of the provisioned cluster. Null if no cluster is created or provided."
             },
             {
               "key": "postgres_crn"
             },
             {
+              "key": "icd_redis_hostname"
+            },
+            {
+              "key": "icd_redis_port"
+            },
+            {
+              "key": "icd_redis_crn"
+            },
+            {
+              "key": "icd_redis_vpe"
+            },
+            {
               "key": "redis_host"
+            },
+            {
+              "key": "redis_port"
             },
             {
               "key": "redis_password"
@@ -468,7 +543,8 @@
               "key": "vpc_subnets"
             },
             {
-              "key": "kube_cluster_sg"
+              "key": "kube_cluster_sg",
+              "description": "The ID of the default security group representing the cluster nodes. Null if no cluster is created or provided."
             },
             {
               "key": "vpc_default_security_group"
@@ -477,13 +553,17 @@
               "key": "vpc_kubecluster_sg_rule"
             },
             {
+              "key": "vpc_kubecluster_redis_sg_rule"
+            },
+            {
               "key": "final_acl_rules"
             },
             {
               "key": "redis_password_secret_crn"
             },
             {
-              "key": "tfe_secondary_hostname_fqdn"
+              "key": "tfe_secondary_hostname_fqdn",
+              "description": "The FQDN for the Terraform Enterprise secondary hostname. Null if no secondary hostname is created or TFE is not installed."
             }
           ],
           "install_type": "fullstack",

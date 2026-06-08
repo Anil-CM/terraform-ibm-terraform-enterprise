@@ -124,7 +124,7 @@ locals {
     },
     {
       name  = "env.variables.TFE_REDIS_USE_TLS"
-      value = false
+      value = var.tfe_redis_use_tls
     },
     {
       name  = "env.variables.TFE_REDIS_HOST"
@@ -252,6 +252,14 @@ locals {
     },
   ]
 
+  # Add Redis TLS certificate if provided
+  set_sensitive_values_redis_tls = var.tfe_redis_use_tls && var.tfe_redis_tls_cert != null ? [
+    {
+      name  = "env.secrets.TFE_REDIS_CA_CERT"
+      value = var.tfe_redis_tls_cert
+    }
+  ] : []
+
   # building the list of sensitive values if a secondary TFE hostname is to be configured
   set_sensitive_values_list_secondary_hostname = var.tfe_secondary_hostname_certificate != null && var.tfe_secondary_hostname_key != null ? [
     {
@@ -264,7 +272,11 @@ locals {
   }] : []
 
   # concatenating sensitive values for the final list
-  set_sensitive_values_list_final = concat(local.set_sensitive_values_list, local.set_sensitive_values_list_secondary_hostname)
+  set_sensitive_values_list_final = concat(
+    local.set_sensitive_values_list,
+    local.set_sensitive_values_list_secondary_hostname,
+    local.set_sensitive_values_redis_tls
+  )
 }
 
 resource "kubernetes_config_map" "custom_tfe_start" {
@@ -321,11 +333,12 @@ locals {
 # ########################################################################################################################
 
 resource "helm_release" "tfe_install" {
-  # depends_on = [kubernetes_secret_v1.tfe_pull_secret, data.helm_template.tfe_install]
   depends_on = [kubernetes_secret_v1.tfe_pull_secret]
 
   name             = "terraform-enterprise"
-  chart            = "${path.module}/chart/tfe"
+  repository       = "https://helm.releases.hashicorp.com"
+  chart            = "terraform-enterprise"
+  version          = var.helm_chart_version
   namespace        = kubernetes_namespace_v1.tfe.metadata[0].name
   create_namespace = false
   timeout          = 1200
@@ -341,9 +354,6 @@ resource "helm_release" "tfe_install" {
 
   values = [
     yamlencode({
-      "config" = {
-        "annotations" = {}
-      }
       "env" = {
         "variables" = {
           "TFE_RUN_PIPELINE_KUBERNETES_OPEN_SHIFT_ENABLED" = "true"
@@ -359,7 +369,9 @@ resource "helm_release" "tfe_install" {
         "labels"      = local.tfe_deployment_labels,
         "annotations" = local.tfe_deployment_annotations
       },
-      "adminHttpsPort"  = null,
+      "tfe" = {
+        "adminHttpsPort" = null
+      },
       "tlsRedis"        = null,
       "tlsRedisSidekiq" = null,
       "container" = {
@@ -389,7 +401,6 @@ resource "helm_release" "tfe_install" {
       "serviceSecondary" = local.tfe_service_secondary_values,
       "serviceAccount"   = local.tfe_service_account,
       "resources"        = local.tfe_resources_configuration,
-      "secret"           = local.tfe_secret,
     }),
   ]
 }
