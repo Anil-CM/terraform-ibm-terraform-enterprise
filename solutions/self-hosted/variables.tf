@@ -64,6 +64,11 @@ variable "tfe_image_tag" {
   description = "The version tag of the Terraform Enterprise image to use"
 }
 
+variable "helm_chart_version" {
+  type        = string
+  description = "The version of the HashiCorp Terraform Enterprise Helm chart to use."
+}
+
 variable "admin_username" {
   type        = string
   description = "The user name of the Terraform Enterprise admin user"
@@ -90,6 +95,16 @@ variable "tfe_organization_name" {
   validation {
     condition     = can(regex("^[a-zA-Z0-9_-]{1,63}$", var.tfe_organization_name))
     error_message = "The Terraform Enterprise organization name must only contain letters, numbers, underscores (_), and hyphens (-), and must not exceed 63 characters."
+  }
+}
+
+variable "deployment_size" {
+  type        = string
+  description = "Deployment size preset that configures cluster and database resources. Options: 'small' (dev/test, ~$500-800/month), 'medium' (small production, ~$1200-1800/month), 'large' (enterprise production, ~$2500-3500/month), 'custom' (use individual sizing variables). Costs are estimates and vary by region and usage."
+  default     = "small"
+  validation {
+    condition     = contains(["small", "medium", "large", "custom"], var.deployment_size)
+    error_message = "deployment_size must be one of: small, medium, large, custom"
   }
 }
 

@@ -30,7 +30,7 @@ output "vpc_subnets" {
 
 output "cluster_id" {
   value       = module.ocp_vpc.cluster_id
-  description = "The ID of the provisioned cluster."
+  description = "The ID of the provisioned cluster. Null if no cluster is created or provided."
 }
 
 output "icd_postgres_hostname" {
@@ -53,9 +53,34 @@ output "icd_postgres_vpe" {
   description = "Details of the Virtual Private Endpoint created towards postgres instance"
 }
 
+output "icd_redis_hostname" {
+  description = "The hostname of the provisioned Redis instance."
+  value       = module.icd_redis.hostname
+}
+
+output "icd_redis_port" {
+  description = "The port of the provisioned Redis instance listens on."
+  value       = module.icd_redis.port
+}
+
+output "icd_redis_crn" {
+  value       = module.icd_redis.crn
+  description = "The CRN of the provisioned Redis instance."
+}
+
+output "icd_redis_vpe" {
+  value       = module.icd_redis_vpe
+  description = "Details of the Virtual Private Endpoint created towards Redis instance"
+}
+
 output "redis_host" {
   value       = local.redis_host
-  description = "The name of the provisioned redis host."
+  description = "The hostname of the provisioned redis host."
+}
+
+output "redis_port" {
+  value       = local.redis_port
+  description = "The port of the provisioned redis instance."
 }
 
 output "redis_password" {
@@ -65,13 +90,13 @@ output "redis_password" {
 }
 
 output "tfe_console_url" {
-  value       = module.tfe_install.tfe_console_url
-  description = "url to access Terraform Enterprise."
+  value       = length(module.tfe_install) > 0 ? module.tfe_install[0].tfe_console_url : null
+  description = "url to access Terraform Enterprise. Null if TFE is not installed."
 }
 
 output "tfe_hostname" {
-  value       = module.tfe_install.tfe_hostname
-  description = "The hostname for Terraform Enterprise instance"
+  value       = length(module.tfe_install) > 0 ? module.tfe_install[0].tfe_hostname : null
+  description = "The hostname for Terraform Enterprise instance. Null if TFE is not installed."
 }
 
 output "redis_password_secret_crn" {
@@ -85,8 +110,8 @@ output "final_acl_rules" {
 }
 
 output "kube_cluster_sg" {
-  description = "The ID of the default security group representing the cluster nodes."
-  value       = module.ocp_vpc.kube_cluster_sg.id
+  description = "The ID of the default security group representing the cluster nodes. Null if no cluster is created or provided."
+  value       = module.ocp_vpc.kube_cluster_sg != null ? module.ocp_vpc.kube_cluster_sg.id : null
 }
 
 output "vpc_default_security_group" {
@@ -95,11 +120,16 @@ output "vpc_default_security_group" {
 }
 
 output "vpc_kubecluster_sg_rule" {
-  description = "The Security group rule going to be attached to the cluster default Security Group in order to enable Postegres connectivity."
+  description = "The Security group rule going to be attached to the cluster default Security Group in order to enable Postgres connectivity."
   value       = ibm_is_security_group_rule.vpc_kubecluster_sg_rule
 }
 
+output "vpc_kubecluster_redis_sg_rule" {
+  description = "The Security group rule going to be attached to the cluster default Security Group in order to enable Redis connectivity."
+  value       = ibm_is_security_group_rule.vpc_kubecluster_redis_sg_rule
+}
+
 output "tfe_secondary_hostname_fqdn" {
-  description = "The FQDN for the Terraform Enterprise secondary hostname. Null if no secondary hostname is created"
-  value       = var.tfe_secondary_host != null ? "https://${local.tfe_secondary_hostname_fqdn}" : null
+  description = "The FQDN for the Terraform Enterprise secondary hostname. Null if no secondary hostname is created or TFE is not installed."
+  value       = length(module.tfe_install) > 0 && var.tfe_secondary_host != null ? "https://${local.tfe_secondary_hostname_fqdn}" : null
 }
