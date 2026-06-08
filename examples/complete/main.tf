@@ -62,11 +62,13 @@ module "tfe" {
   vpc_name                                 = "${local.prefix}vpc"
   cluster_name                             = "${local.prefix}cluster"
   postgres_instance_name                   = "${local.prefix}data-store"
+  redis_instance_name                      = "${local.prefix}redis"
   cos_instance_name                        = "${local.prefix}cos"
   cos_bucket_name                          = "${local.prefix}cos-bucket"
   tfe_license                              = var.tfe_license
   tfe_license_secret_crn                   = var.tfe_license_secret_crn
   tfe_image_tag                            = var.tfe_image_tag
+  helm_chart_version                       = var.helm_chart_version
   admin_username                           = var.admin_username
   admin_password                           = var.admin_password
   admin_email                              = var.admin_email
@@ -75,6 +77,11 @@ module "tfe" {
   postgres_vpe_enabled                     = var.postgres_vpe_enabled
   postgres_service_endpoints               = var.postgres_service_endpoints
   postgres_vpe_service_endpoints           = var.postgres_vpe_service_endpoints
+  redis_deletion_protection                = var.redis_deletion_protection
+  redis_vpe_enabled                        = var.redis_vpe_enabled
+  redis_service_endpoints                  = var.redis_service_endpoints
+  redis_vpe_service_endpoints              = var.redis_vpe_service_endpoints
+  redis_add_acl_rule                       = var.redis_add_acl_rule
   subnets_zones_cidr                       = var.subnets_zones_cidr
   vpc_acl_rules                            = var.vpc_acl_rules
   postgres_add_acl_rule                    = var.postgres_add_acl_rule

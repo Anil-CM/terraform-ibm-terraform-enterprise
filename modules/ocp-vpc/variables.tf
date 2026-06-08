@@ -136,3 +136,15 @@ variable "cluster_name" {
     error_message = "var.existing_cluster_id and var.cluster_name cannot be both null."
   }
 }
+
+variable "cluster_flavor" {
+  type        = string
+  description = "The flavor (machine type) of the worker nodes for the cluster."
+  default     = "bx2.4x16"
+}
+
+variable "worker_count" {
+  type        = number
+  description = "Number of worker nodes per zone."
+  default     = 1
+}

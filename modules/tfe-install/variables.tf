@@ -74,6 +74,12 @@ variable "tfe_image_tag" {
   type        = string
 }
 
+variable "helm_chart_version" {
+  description = "The version of the HashiCorp Terraform Enterprise Helm chart to use. If not specified, the latest version will be used."
+  type        = string
+  default     = "1.6.8"
+}
+
 variable "tfe_encryption_password" {
   description = "The encryption password for Terraform Enterprise"
   type        = string
@@ -142,6 +148,19 @@ variable "tfe_redis_password" {
   description = "The Redis password for Terraform Enterprise"
   type        = string
   default     = ""
+  sensitive   = true
+}
+
+variable "tfe_redis_use_tls" {
+  description = "Whether to use TLS for Redis connection. Set to true for IBM Cloud Redis (ICD)."
+  type        = bool
+  default     = false
+}
+
+variable "tfe_redis_tls_cert" {
+  description = "Base64-encoded TLS certificate for Redis connection. Required when tfe_redis_use_tls is true."
+  type        = string
+  default     = null
   sensitive   = true
 }
 

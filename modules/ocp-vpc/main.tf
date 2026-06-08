@@ -67,8 +67,8 @@ locals {
     {
       subnet_prefix                     = "default"
       pool_name                         = "default"  # ibm_container_vpc_cluster automatically names default pool "default" (See https://github.com/IBM-Cloud/terraform-provider-ibm/issues/2849)
-      machine_type                      = "bx2.4x16" # smallest machine type available in VPC
-      workers_per_zone                  = 2
+      machine_type                      = var.cluster_flavor
+      workers_per_zone                  = var.worker_count
       operating_system                  = "RHCOS"
       labels                            = {}
       resource_group_id                 = var.resource_group_id
@@ -103,24 +103,29 @@ data "ibm_container_vpc_cluster" "cluster" {
 }
 
 locals {
-  cluster_name     = var.existing_cluster_id != null ? data.ibm_container_vpc_cluster.cluster[0].name : module.openshift[0].cluster_name
-  cluster_id       = var.existing_cluster_id != null ? data.ibm_container_vpc_cluster.cluster[0].id : module.openshift[0].cluster_id
-  ingress_hostname = var.existing_cluster_id != null ? data.ibm_container_vpc_cluster.cluster[0].ingress_hostname : module.openshift[0].ingress_hostname
+  # Determine if we have a cluster (either existing or newly created)
+  has_cluster = var.existing_cluster_id != null || length(module.openshift) > 0
+  
+  cluster_name     = var.existing_cluster_id != null ? data.ibm_container_vpc_cluster.cluster[0].name : (length(module.openshift) > 0 ? module.openshift[0].cluster_name : null)
+  cluster_id       = var.existing_cluster_id != null ? data.ibm_container_vpc_cluster.cluster[0].id : (length(module.openshift) > 0 ? module.openshift[0].cluster_id : null)
+  ingress_hostname = var.existing_cluster_id != null ? data.ibm_container_vpc_cluster.cluster[0].ingress_hostname : (length(module.openshift) > 0 ? module.openshift[0].ingress_hostname : null)
   vpc_id           = module.vpc.vpc_id
   vpc_name         = module.vpc.vpc_name
 }
 
 locals {
-  cluster_security_group = [for group in data.ibm_is_security_groups.vpc_security_groups.security_groups : group if group.name == "kube-${local.cluster_id}"][0]
+  cluster_security_group = local.has_cluster ? [for group in data.ibm_is_security_groups.vpc_security_groups[0].security_groups : group if group.name == "kube-${local.cluster_id}"][0] : null
 }
 
 data "ibm_is_security_groups" "vpc_security_groups" {
+  count  = local.has_cluster ? 1 : 0
   vpc_id = var.existing_cluster_id != null ? module.vpc.id : module.openshift[0].vpc_id
 }
 
 # Kube-<vpc id> Security Group
 data "ibm_is_security_group" "kube_cluster_sg" {
-  name = local.cluster_security_group.name
+  count = local.has_cluster ? 1 : 0
+  name  = local.cluster_security_group.name
 }
 
 data "ibm_is_vpc" "vpc" {

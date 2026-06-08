@@ -17,15 +17,18 @@ module "tfe" {
   region                                   = var.region
   resource_group_id                        = module.resource_group.resource_group_id
   resource_tags                            = var.resource_tags
-  vpc_name                                 = "${local.prefix}vpc"
-  cluster_name                             = "${local.prefix}cluster"
-  kms_instance_name                        = "${local.prefix}kms"
-  postgres_instance_name                   = "${local.prefix}data-store"
-  cos_instance_name                        = "${local.prefix}cos"
-  cos_bucket_name                          = "${local.prefix}cos-bucket"
+  deployment_size                          = var.deployment_size
+  vpc_name                                 = "${local.prefix}terraform-enterprise-vpc"
+  cluster_name                             = "${local.prefix}terraform-enterprise-cluster"
+  kms_instance_name                        = "${local.prefix}terraform-enterprise-kms"
+  postgres_instance_name                   = "${local.prefix}terraform-enterprise-postgres"
+  redis_instance_name                      = "${local.prefix}terraform-enterprise-redis"
+  cos_instance_name                        = "${local.prefix}terraform-enterprise-cos"
+  cos_bucket_name                          = "${local.prefix}terraform-enterprise-bucket"
   tfe_license                              = var.tfe_license
   tfe_license_secret_crn                   = var.tfe_license_secret_crn
   tfe_image_tag                            = var.tfe_image_tag
+  helm_chart_version                       = var.helm_chart_version
   admin_username                           = var.admin_username
   admin_password                           = var.admin_password
   admin_email                              = var.admin_email
@@ -41,8 +44,8 @@ module "tfe" {
   add_to_catalog                           = var.add_to_catalog
   existing_secrets_manager_crn             = var.secrets_manager_crn
   existing_secrets_manager_secret_group_id = var.secrets_manager_secret_group_id
-  secrets_manager_secret_group_name        = "${local.prefix}secrets-group"
-  redis_password_secret_name               = "${local.prefix}redis-password"
+  secrets_manager_secret_group_name        = "${local.prefix}terraform-enterprise-secrets"
+  redis_password_secret_name               = "${local.prefix}terraform-enterprise-redis-password"
   # TFE secondary hostname management
   tfe_secondary_host                         = var.tfe_secondary_host
   existing_cis_instance_name                 = var.existing_cis_instance_name
