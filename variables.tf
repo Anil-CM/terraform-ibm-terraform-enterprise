@@ -40,6 +40,12 @@ variable "tfe_image_tag" {
   description = "The version tag of the Terraform Enterprise image to use"
 }
 
+variable "helm_chart_version" {
+  type        = string
+  description = "The version of the HashiCorp Terraform Enterprise Helm chart to use. If not specified, the latest version will be used."
+  default     = "1.6.8"
+}
+
 variable "tfe_license_secret_crn" {
   type        = string
   description = "The CRN of the Secrets Manager secret containing the license key for Terraform Enterprise"
@@ -237,9 +243,59 @@ variable "postgres_add_acl_rule" {
 # Redis
 ##############################################################################
 
+variable "redis_instance_name" {
+  type        = string
+  description = "Name of Redis instance to create. Default set to be `tfe-redis`"
+  default     = "tfe-redis"
+}
+
+variable "redis_version" {
+  type        = string
+  description = "Version of Redis to deploy. Default is null which will deploy the latest version."
+  default     = null
+}
+
+variable "redis_deletion_protection" {
+  type        = bool
+  description = "Enable deletion protection within terraform. This is not a property of the resource and does not prevent deletion outside of terraform. The database can not be deleted by terraform when this value is set to 'true'. In order to delete with terraform the value must be set to 'false' and a terraform apply performed before the destroy is performed. The default is 'true'."
+  default     = true
+}
+
+variable "redis_service_endpoints" {
+  description = "Service endpoints for the Redis instance to deploy. Default is `public-and-private`"
+  default     = "public-and-private"
+  type        = string
+  validation {
+    condition     = contains(["private", "public-and-private"], var.redis_service_endpoints)
+    error_message = "Allowed values for var.redis_service_endpoints are 'private' and 'public-and-private'"
+  }
+}
+
+variable "redis_vpe_enabled" {
+  type        = bool
+  description = "Enable VPE connection for the Redis instance. Default is `false`. If true, a VPE gateway is created to the Redis instance on its private endpoint. TFE is configured to connect to Redis via the VPE on the private endpoint only if var.redis_service_endpoints is set to \"private\"."
+  default     = false
+}
+
+variable "redis_vpe_service_endpoints" {
+  type        = string
+  description = "Service endpoints to use to create endpoint gateway to Redis instance."
+  default     = "public"
+  validation {
+    condition     = contains(["public", "private"], var.redis_vpe_service_endpoints)
+    error_message = "The value of var.redis_vpe_service_endpoints can be only public or private"
+  }
+}
+
+variable "redis_add_acl_rule" {
+  type        = bool
+  default     = true
+  description = "Concatenate two rules to enable traffic to/from Redis instance port to the VPC ACLs. If redis_vpe_enabled is enabled the ACL rules will be configured VPC subnets CIDR as source and target, if redis_vpe_enabled is disabled the ACL rules will use 0.0.0.0/0 as CIDR of Redis instance references. Default true."
+}
+
 variable "existing_redis_hostname" {
   type        = string
-  description = "Hostname of the existing redis instance to integrate with the Terraform Enterprise instance. If set to null a new redis instance is deployed in the cluster. Default to null."
+  description = "Hostname of the existing redis instance to integrate with the Terraform Enterprise instance. If set to null a new redis instance is deployed. Default to null."
   default     = null
 }
 
@@ -304,14 +360,40 @@ variable "cluster_name" {
 
 variable "ocp_version" {
   type        = string
-  description = "Version of the OCP cluster to provision"
+  description = "Version of the OpenShift cluster to provision. If not specified, the latest available version will be used."
   default     = null
 }
 
 variable "ocp_entitlement" {
   type        = string
-  description = "Value that is applied to the entitlements for OCP cluster provisioning"
+  description = "Value that is applied to the entitlements for OpenShift cluster provisioning. Use 'cloud_pak' if you have Cloud Pak entitlements."
   default     = null
+}
+
+variable "cluster_flavor" {
+  type        = string
+  description = "The flavor (machine type) of the worker nodes for the cluster. Common options: 'bx2.4x16' (small), 'bx2.8x32' (medium), 'bx2.16x64' (large). See https://cloud.ibm.com/docs/containers?topic=containers-planning_worker_nodes for available flavors."
+  default     = "bx2.4x16"
+}
+
+variable "cluster_worker_count" {
+  type        = number
+  description = "Number of worker nodes per zone. Minimum 1 for development, 2+ recommended for production. Total workers = worker_count * number_of_zones."
+  default     = 1
+  validation {
+    condition     = var.cluster_worker_count >= 1
+    error_message = "cluster_worker_count must be at least 1."
+  }
+}
+
+variable "deployment_size" {
+  type        = string
+  description = "Deployment size preset that configures cluster and database resources. Options: 'small' (dev/test), 'medium' (small production), 'large' (enterprise production), 'custom' (use individual sizing variables). When set to 'small', 'medium', or 'large', individual sizing variables are ignored."
+  default     = "small"
+  validation {
+    condition     = contains(["small", "medium", "large", "custom"], var.deployment_size)
+    error_message = "deployment_size must be one of: small, medium, large, custom"
+  }
 }
 
 variable "vpc_acl_rules" {

@@ -60,6 +60,12 @@ variable "tfe_image_tag" {
   description = "The version tag of the Terraform Enterprise image to use"
 }
 
+variable "helm_chart_version" {
+  type        = string
+  description = "The version of the HashiCorp Terraform Enterprise Helm chart to use. If not specified, the latest version will be used."
+  default     = "1.6.8"
+}
+
 variable "admin_username" {
   type        = string
   description = "The user name of the Terraform Enterprise admin user"
@@ -315,6 +321,44 @@ variable "postgres_add_acl_rule" {
   type        = bool
   default     = true
   description = "Concatenate two rules to enable traffic to/from Postgres instance port to the VPC ACLs. If postgres_vpe_enabled is enabled the ACL rules will be configured VPC subnets CIDR as source and target, if postgres_vpe_enabled is disabled the ACL rules will use 0.0.0.0/0 as CIDR of Postgres instance references. Default true."
+}
+
+variable "redis_add_acl_rule" {
+  type        = bool
+  default     = true
+  description = "Concatenate two rules to enable traffic to/from Redis instance port to the VPC ACLs. If redis_vpe_enabled is enabled the ACL rules will be configured VPC subnets CIDR as source and target, if redis_vpe_enabled is disabled the ACL rules will use 0.0.0.0/0 as CIDR of Redis instance references. Default true."
+}
+
+variable "redis_deletion_protection" {
+  type        = bool
+  description = "Enable deletion protection within terraform. The database can not be deleted by terraform when this value is set to 'true'. In order to delete with terraform the value must be set to 'false' and a terraform apply performed before the destroy is performed. The default is 'true'."
+  default     = true
+}
+
+variable "redis_service_endpoints" {
+  description = "Service endpoints for the Redis instance to deploy. Default is `public-and-private`"
+  default     = "public-and-private"
+  type        = string
+  validation {
+    condition     = contains(["private", "public-and-private"], var.redis_service_endpoints)
+    error_message = "Allowed values for var.redis_service_endpoints are 'private' and 'public-and-private'"
+  }
+}
+
+variable "redis_vpe_enabled" {
+  type        = bool
+  description = "Enable VPE connection for the Redis instance. Default is `false`. If true, a VPE gateway is created to the Redis instance and TFE is configured with the VPE endpoint."
+  default     = false
+}
+
+variable "redis_vpe_service_endpoints" {
+  type        = string
+  description = "Service endpoints to use to create endpoint gateway to Redis instance. Default to 'public'."
+  default     = "public"
+  validation {
+    condition     = contains(["public", "private"], var.redis_vpe_service_endpoints)
+    error_message = "Allowed values for var.redis_vpe_service_endpoints are 'public' and 'private'"
+  }
 }
 
 variable "subnets_zones_cidr" {

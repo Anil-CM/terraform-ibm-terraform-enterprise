@@ -3,40 +3,40 @@ data "ibm_container_vpc_cluster" "cluster" {
   resource_group_id = var.cluster_resource_group_id
 }
 
-resource "kubernetes_namespace_v1" "tfe" {
-  metadata {
-    name = var.namespace
-  }
-
-  # Ignore annotations that TFE may add to namespace
-  lifecycle {
-    ignore_changes = [
-      metadata["annotations"],
-    ]
-  }
+resource "kubectl_manifest" "tfe_namespace" {
+  yaml_body = yamlencode({
+    apiVersion = "v1"
+    kind       = "Namespace"
+    metadata = {
+      name = var.namespace
+    }
+  })
 }
 
-resource "kubernetes_secret_v1" "tfe_pull_secret" {
-  # This secret is used to pull the Terraform Enterprise image from the registry
-  metadata {
-    name      = "terraform-enterprise"
-    namespace = kubernetes_namespace_v1.tfe.metadata[0].name
-  }
+resource "kubectl_manifest" "tfe_pull_secret" {
+  depends_on = [kubectl_manifest.tfe_namespace]
 
-  type = "kubernetes.io/dockerconfigjson"
-
-  data = {
-    ".dockerconfigjson" = jsonencode({
-      auths = {
-        "images.releases.hashicorp.com" = {
-          "username" = "terraform"
-          "password" = var.tfe_license
-          "email"    = "test@example.com"
-          "auth"     = base64encode("terraform:${var.tfe_license}")
+  yaml_body = yamlencode({
+    apiVersion = "v1"
+    kind       = "Secret"
+    metadata = {
+      name      = "terraform-enterprise"
+      namespace = var.namespace
+    }
+    type = "kubernetes.io/dockerconfigjson"
+    data = {
+      ".dockerconfigjson" = base64encode(jsonencode({
+        auths = {
+          "images.releases.hashicorp.com" = {
+            "username" = "terraform"
+            "password" = var.tfe_license
+            "email"    = "test@example.com"
+            "auth"     = base64encode("terraform:${var.tfe_license}")
+          }
         }
-      }
-    })
-  }
+      }))
+    }
+  })
 }
 
 locals {
@@ -124,7 +124,7 @@ locals {
     },
     {
       name  = "env.variables.TFE_REDIS_USE_TLS"
-      value = false
+      value = var.tfe_redis_use_tls
     },
     {
       name  = "env.variables.TFE_REDIS_HOST"
@@ -144,7 +144,7 @@ locals {
     },
     {
       name  = "env.variables.TFE_RUN_PIPELINE_IMAGE"
-      value = data.kubernetes_resource.tfe_agent_image_stream.object.status.dockerImageRepository
+      value = "image-registry.openshift-image-registry.svc:5000/${var.namespace}/tfe-agent-ibmcloud:latest"
     },
     {
       name  = "env.variables.TFE_OBJECT_STORAGE_S3_USE_INSTANCE_PROFILE"
@@ -152,7 +152,7 @@ locals {
     },
     {
       name  = "env.variables.TFE_RUN_PIPELINE_KUBERNETES_NAMESPACE"
-      value = kubernetes_namespace_v1.tfe.metadata[0].name
+      value = var.namespace
     },
     {
       name  = "agents.namespace.enabled"
@@ -160,7 +160,7 @@ locals {
     },
     {
       name  = "agents.namespace.name"
-      value = kubernetes_namespace_v1.tfe.metadata[0].name
+      value = var.namespace
     },
     {
       name  = "serviceAccount.enabled"
@@ -252,6 +252,14 @@ locals {
     },
   ]
 
+  # Add Redis TLS certificate if provided
+  set_sensitive_values_redis_tls = var.tfe_redis_use_tls && var.tfe_redis_tls_cert != null ? [
+    {
+      name  = "env.secrets.TFE_REDIS_CA_CERT"
+      value = var.tfe_redis_tls_cert
+    }
+  ] : []
+
   # building the list of sensitive values if a secondary TFE hostname is to be configured
   set_sensitive_values_list_secondary_hostname = var.tfe_secondary_hostname_certificate != null && var.tfe_secondary_hostname_key != null ? [
     {
@@ -264,18 +272,27 @@ locals {
   }] : []
 
   # concatenating sensitive values for the final list
-  set_sensitive_values_list_final = concat(local.set_sensitive_values_list, local.set_sensitive_values_list_secondary_hostname)
+  set_sensitive_values_list_final = concat(
+    local.set_sensitive_values_list,
+    local.set_sensitive_values_list_secondary_hostname,
+    local.set_sensitive_values_redis_tls
+  )
 }
 
-resource "kubernetes_config_map" "custom_tfe_start" {
-  metadata {
-    name      = "custom-tfe-start"
-    namespace = kubernetes_namespace_v1.tfe.metadata[0].name
-  }
+resource "kubectl_manifest" "custom_tfe_start" {
+  depends_on = [kubectl_manifest.tfe_namespace]
 
-  data = {
-    "custom_tfe_start.sh" = file("${path.module}/scripts/custom_tfe_start.sh")
-  }
+  yaml_body = yamlencode({
+    apiVersion = "v1"
+    kind       = "ConfigMap"
+    metadata = {
+      name      = "custom-tfe-start"
+      namespace = var.namespace
+    }
+    data = {
+      "custom_tfe_start.sh" = file("${path.module}/scripts/custom_tfe_start.sh")
+    }
+  })
 }
 
 locals {
@@ -321,12 +338,13 @@ locals {
 # ########################################################################################################################
 
 resource "helm_release" "tfe_install" {
-  # depends_on = [kubernetes_secret_v1.tfe_pull_secret, data.helm_template.tfe_install]
-  depends_on = [kubernetes_secret_v1.tfe_pull_secret]
+  depends_on = [kubectl_manifest.tfe_pull_secret, kubectl_manifest.custom_tfe_start]
 
   name             = "terraform-enterprise"
-  chart            = "${path.module}/chart/tfe"
-  namespace        = kubernetes_namespace_v1.tfe.metadata[0].name
+  repository       = "https://helm.releases.hashicorp.com"
+  chart            = "terraform-enterprise"
+  version          = var.helm_chart_version
+  namespace        = var.namespace
   create_namespace = false
   timeout          = 1200
   wait             = true
@@ -341,9 +359,6 @@ resource "helm_release" "tfe_install" {
 
   values = [
     yamlencode({
-      "config" = {
-        "annotations" = {}
-      }
       "env" = {
         "variables" = {
           "TFE_RUN_PIPELINE_KUBERNETES_OPEN_SHIFT_ENABLED" = "true"
@@ -359,7 +374,9 @@ resource "helm_release" "tfe_install" {
         "labels"      = local.tfe_deployment_labels,
         "annotations" = local.tfe_deployment_annotations
       },
-      "adminHttpsPort"  = null,
+      "tfe" = {
+        "adminHttpsPort" = null
+      },
       "tlsRedis"        = null,
       "tlsRedisSidekiq" = null,
       "container" = {
@@ -389,7 +406,6 @@ resource "helm_release" "tfe_install" {
       "serviceSecondary" = local.tfe_service_secondary_values,
       "serviceAccount"   = local.tfe_service_account,
       "resources"        = local.tfe_resources_configuration,
-      "secret"           = local.tfe_secret,
     }),
   ]
 }
@@ -399,24 +415,29 @@ resource "random_string" "iact_token" {
   special = false
 }
 
-resource "kubernetes_role_binding_v1" "tfe_admin" {
+resource "kubectl_manifest" "tfe_admin" {
+  depends_on = [helm_release.tfe_install]
 
-  metadata {
-    name      = "tfe-anyuuid"
-    namespace = kubernetes_namespace_v1.tfe.metadata[0].name
-  }
-
-  role_ref {
-    api_group = "rbac.authorization.k8s.io"
-    kind      = "ClusterRole"
-    name      = "system:openshift:scc:anyuid"
-  }
-
-  subject {
-    kind      = "ServiceAccount"
-    name      = "tfe"
-    namespace = var.namespace
-  }
+  yaml_body = yamlencode({
+    apiVersion = "rbac.authorization.k8s.io/v1"
+    kind       = "RoleBinding"
+    metadata = {
+      name      = "tfe-anyuuid"
+      namespace = var.namespace
+    }
+    roleRef = {
+      apiGroup = "rbac.authorization.k8s.io"
+      kind     = "ClusterRole"
+      name     = "system:openshift:scc:anyuid"
+    }
+    subjects = [
+      {
+        kind      = "ServiceAccount"
+        name      = "tfe"
+        namespace = var.namespace
+      }
+    ]
+  })
 }
 
 resource "kubectl_manifest" "tfe_route" {
@@ -427,7 +448,7 @@ resource "kubectl_manifest" "tfe_route" {
     kind: Route
     metadata:
       name: ${local.route_name}
-      namespace: ${kubernetes_namespace_v1.tfe.metadata[0].name}
+      namespace: ${var.namespace}
     spec:
       to:
         kind: Service
@@ -449,7 +470,7 @@ resource "kubectl_manifest" "tfe_secondary_route" {
     kind: Route
     metadata:
       name: "tfe-secondary-route"
-      namespace: ${kubernetes_namespace_v1.tfe.metadata[0].name}
+      namespace: ${var.namespace}
     spec:
       host: ${var.tfe_secondary_hostname_fqdn}
       to:
@@ -464,8 +485,21 @@ resource "kubectl_manifest" "tfe_secondary_route" {
 
 }
 
+# Wait for TFE to be fully ready before creating admin user
+resource "time_sleep" "wait_for_tfe_ready" {
+  depends_on = [
+    helm_release.tfe_install,
+    kubectl_manifest.tfe_route
+  ]
+  
+  create_duration = "180s"  # Wait 3 minutes for TFE pods to be fully ready and healthy
+}
+
 data "external" "admin_user_token" {
-  depends_on = [kubectl_manifest.tfe_route]
+  depends_on = [
+    kubectl_manifest.tfe_route,
+    time_sleep.wait_for_tfe_ready
+  ]
   program = [
     "${path.module}/scripts/create_admin_user.sh",
     local.tfe_hostname,
@@ -483,7 +517,7 @@ resource "kubectl_manifest" "tfe_agent_image_stream" {
     kind: ImageStream
     metadata:
       name: tfe-agent-ibmcloud
-      namespace: ${kubernetes_namespace_v1.tfe.metadata[0].name}
+      namespace: ${var.namespace}
     spec:
       lookupPolicy:
         local: false
@@ -496,7 +530,7 @@ resource "kubectl_manifest" "tfe_agent_build_config" {
     kind: BuildConfig
     metadata:
       name: tfe-agent-ibmcloud
-      namespace: ${kubernetes_namespace_v1.tfe.metadata[0].name}
+      namespace: ${var.namespace}
     spec:
       source:
         type: Dockerfile
@@ -537,31 +571,22 @@ resource "kubectl_manifest" "tfe_agent_build_config" {
   YAML
 }
 
-data "kubernetes_resource" "tfe_agent_image_stream" {
-  depends_on  = [kubectl_manifest.tfe_agent_image_stream]
-  api_version = "image.openshift.io/v1"
-  kind        = "ImageStream"
-  metadata {
-    name      = "tfe-agent-ibmcloud"
-    namespace = kubernetes_namespace_v1.tfe.metadata[0].name
-  }
-}
 
-data "kubernetes_resource" "tfe_route" {
-  depends_on  = [kubectl_manifest.tfe_route]
-  api_version = "route.openshift.io/v1"
-  kind        = "Route"
-  metadata {
-    name      = local.route_name
-    namespace = kubernetes_namespace_v1.tfe.metadata[0].name
-  }
-}
-
+# Try to read existing secret, but don't fail if it doesn't exist
 data "kubernetes_secret_v1" "tfe_admin_token" {
   depends_on = [data.external.admin_user_token]
+  
   metadata {
     name      = "tfe-admin-token"
-    namespace = kubernetes_namespace_v1.tfe.metadata[0].name
+    namespace = var.namespace
+  }
+  
+  # Don't fail on first apply when secret doesn't exist yet
+  lifecycle {
+    postcondition {
+      condition     = self.data != null || data.external.admin_user_token.result["token"] != null
+      error_message = "Unable to retrieve admin token from either existing secret or admin user creation"
+    }
   }
 }
 
@@ -570,19 +595,18 @@ resource "kubernetes_secret_v1" "tfe_admin_token" {
 
   metadata {
     name      = "tfe-admin-token"
-    namespace = kubernetes_namespace_v1.tfe.metadata[0].name
+    namespace = var.namespace
   }
   data = {
     token = (
       data.external.admin_user_token.result["token"] != null && data.external.admin_user_token.result["token"] != "" && data.external.admin_user_token.result["token"] != "-1"
       ? data.external.admin_user_token.result["token"]
-      : (try(data.kubernetes_secret_v1.tfe_admin_token.data.token, ""))
+      : (try(data.kubernetes_secret_v1.tfe_admin_token.data["token"], ""))
     )
   }
   type = "Opaque"
 
-  # Ignore data token, if it exists, the data.kubernetes_secret is unknown at apply
-  # It has just be read from the secret... so no need to write it.
+  # Ignore data token changes to prevent unnecessary updates
   lifecycle {
     ignore_changes = [
       data["token"],
@@ -590,12 +614,22 @@ resource "kubernetes_secret_v1" "tfe_admin_token" {
   }
 }
 
-# Use scrupt to create TFE organization
+# Use script to create TFE organization
 # This is a workaround to avoid using the TFE provider which attempt to evaluate the token and host before the deployment is created
 resource "null_resource" "tfe_org" {
+  depends_on = [
+    kubernetes_secret_v1.tfe_admin_token,
+    time_sleep.wait_for_tfe_ready
+  ]
+  
   count = var.tfe_organization != null && length(trimspace(var.tfe_organization)) > 0 ? 1 : 0
 
   provisioner "local-exec" {
-    command = "${path.module}/scripts/create_org.sh ${kubernetes_secret_v1.tfe_admin_token.data.token} ${var.tfe_organization} ${var.admin_email} ${data.kubernetes_resource.tfe_route.object.status.ingress[0].host}"
+    command = "${path.module}/scripts/create_org.sh ${kubernetes_secret_v1.tfe_admin_token.data.token} ${var.tfe_organization} ${var.admin_email} ${local.tfe_hostname}"
+  }
+  
+  # Add trigger to recreate if token changes
+  triggers = {
+    token_id = kubernetes_secret_v1.tfe_admin_token.id
   }
 }

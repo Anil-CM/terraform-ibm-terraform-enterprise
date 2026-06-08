@@ -10,29 +10,11 @@ provider "ibm" {
 }
 
 # Download cluster config which is required to connect to cluster
-data "ibm_container_cluster_config" "cluster_config" {
-  cluster_name_id   = module.tfe.cluster_id
-  resource_group_id = module.tfe.resource_group_id
-  config_dir        = "${path.module}/kubeconfig"
-}
-
-provider "helm" {
-  kubernetes = {
-    host                   = data.ibm_container_cluster_config.cluster_config.host
-    token                  = data.ibm_container_cluster_config.cluster_config.token
-    cluster_ca_certificate = data.ibm_container_cluster_config.cluster_config.ca_certificate
-  }
-}
-
-provider "kubernetes" {
-  host                   = data.ibm_container_cluster_config.cluster_config.host
-  token                  = data.ibm_container_cluster_config.cluster_config.token
-  cluster_ca_certificate = data.ibm_container_cluster_config.cluster_config.ca_certificate
-}
-
-provider "kubectl" {
-  host                   = data.ibm_container_cluster_config.cluster_config.host
-  token                  = data.ibm_container_cluster_config.cluster_config.token
-  cluster_ca_certificate = data.ibm_container_cluster_config.cluster_config.ca_certificate
-  load_config_file       = false # https://github.com/gavinbunney/terraform-provider-kubectl/issues/333
-}
+# NOTE: This wrapper intentionally does not configure kubernetes/helm/kubectl providers
+# from module outputs because doing so creates a dependency cycle during plan when the
+# cluster is created in the same graph. Those providers are configured inside the root
+# module after the cluster dependency chain is resolved.
+#
+# For two-pass apply workflow:
+# Pass 1: terraform apply (creates infrastructure including cluster)
+# Pass 2: terraform apply (installs TFE using the cluster created in pass 1)

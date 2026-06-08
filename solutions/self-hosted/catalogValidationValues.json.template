@@ -3,6 +3,8 @@
   "existing_resource_group_name": $RG_NAME,
   "prefix": $PREFIX,
   "tfe_license": $TFE_LICENSE,
+  "tfe_image_tag": "v202501-1",
+  "helm_chart_version": "1.6.8",
   "admin_email": "validation@example.com",
   "admin_password": $RAND_PASSWORD,
   "add_to_catalog": false

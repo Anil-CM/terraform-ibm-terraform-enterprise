@@ -8,12 +8,12 @@ output "tfe_installation_status" {
 
 output "tfe_console_url" {
   description = "The URL to access the Terraform Enterprise console"
-  value       = "https://${data.kubernetes_resource.tfe_route.object.status.ingress[0].host}"
+  value       = "https://${local.tfe_hostname}"
 }
 
 output "tfe_hostname" {
   description = "The hostname for Terraform Enterprise instance"
-  value       = data.kubernetes_resource.tfe_route.object.status.ingress[0].host
+  value       = local.tfe_hostname
 }
 
 output "token" {

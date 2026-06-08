@@ -4,17 +4,17 @@
 
 output "cluster_name" {
   value       = local.cluster_name
-  description = "The name of the provisioned cluster."
+  description = "The name of the provisioned cluster. Null if no cluster is created or provided."
 }
 
 output "cluster_id" {
   value       = local.cluster_id
-  description = "The ID of the provisioned cluster."
+  description = "The ID of the provisioned cluster. Null if no cluster is created or provided."
 }
 
 output "ingress_hostname" {
   value       = local.ingress_hostname
-  description = "The hostname of the cluster's ingress controller."
+  description = "The hostname of the cluster's ingress controller. Null if no cluster is created or provided."
 }
 
 output "vpc_id" {
@@ -38,8 +38,8 @@ output "security_group_details" {
 }
 
 output "kube_cluster_sg" {
-  description = "The ID of the default security group representing the cluster nodes."
-  value       = data.ibm_is_security_group.kube_cluster_sg
+  description = "The ID of the default security group representing the cluster nodes. Null if no cluster is created or provided."
+  value       = local.has_cluster ? data.ibm_is_security_group.kube_cluster_sg[0] : null
 }
 
 output "vpc_default_security_group" {

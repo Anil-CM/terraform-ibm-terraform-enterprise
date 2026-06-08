@@ -1,4 +1,49 @@
 ##############################################################################
+# Deployment Size Configuration
+##############################################################################
+
+locals {
+  # Deployment size presets
+  size_presets = {
+    small = {
+      cluster_flavor       = "bx2.4x16"
+      cluster_worker_count = 1
+      postgres_members     = 2
+      postgres_memory_mb   = 4096
+      postgres_disk_mb     = 20480
+      redis_members        = 2
+      redis_memory_mb      = 2048
+      redis_disk_mb        = 2048
+    }
+    medium = {
+      cluster_flavor       = "bx2.8x32"
+      cluster_worker_count = 2
+      postgres_members     = 3
+      postgres_memory_mb   = 8192
+      postgres_disk_mb     = 51200
+      redis_members        = 3
+      redis_memory_mb      = 4096
+      redis_disk_mb        = 4096
+    }
+    large = {
+      cluster_flavor       = "bx2.16x64"
+      cluster_worker_count = 3
+      postgres_members     = 3
+      postgres_memory_mb   = 16384
+      postgres_disk_mb     = 102400
+      redis_members        = 3
+      redis_memory_mb      = 8192
+      redis_disk_mb        = 8192
+    }
+  }
+
+  # Use preset if deployment_size is not 'custom', otherwise use individual variables
+  selected_preset      = var.deployment_size != "custom" ? local.size_presets[var.deployment_size] : null
+  effective_flavor     = var.deployment_size != "custom" ? local.selected_preset.cluster_flavor : var.cluster_flavor
+  effective_worker_count = var.deployment_size != "custom" ? local.selected_preset.cluster_worker_count : var.cluster_worker_count
+}
+
+##############################################################################
 # Create Key Protect KMS instance and keys
 ##############################################################################
 
@@ -29,6 +74,10 @@ module "key_protect_all_inclusive" {
         },
         {
           key_name     = "terraform-enterprise-postgresql-backup"
+          force_delete = local.force_delete
+        },
+        {
+          key_name     = "terraform-enterprise-redis"
           force_delete = local.force_delete
         },
         {
@@ -96,6 +145,8 @@ module "ocp_vpc" {
   vpc_acl_rules       = local.final_acl_rules
   subnets_zones_cidr  = var.subnets_zones_cidr
   kms_config          = local.kms_config
+  cluster_flavor      = local.effective_flavor
+  worker_count        = local.effective_worker_count
 }
 
 ########################################################################################################################
@@ -204,11 +255,23 @@ locals {
   # if VPE connections is enabled (var.postgres_vpe_enabled flag true) and postgres_service_endpoints is "private", use the VPE ACL rules
   # otherwise use the public ACL rules
   # the same for postgres_service_endpoints "public-and-private" as we enforce private endpoint as postgresql hostname
-  final_acl_rules = var.postgres_add_acl_rule ? (
+  postgres_acl_rules = var.postgres_add_acl_rule ? (
     var.postgres_vpe_enabled == true && (var.postgres_service_endpoints == "private" || var.postgres_service_endpoints == "public-and-private") ?
-    concat(var.vpc_acl_rules, local.postgres_vpe_acl_rules) :
-    concat(var.vpc_acl_rules, local.postgres_public_acl_rules)
-  ) : var.vpc_acl_rules
+    local.postgres_vpe_acl_rules :
+    local.postgres_public_acl_rules
+  ) : []
+
+  # if redis_add_acl_rule is true, concatenate the appropriate redis ACL rules to the VPC ACL rules
+  # if VPE connections is enabled (var.redis_vpe_enabled flag true) and redis_service_endpoints is "private", use the VPE ACL rules
+  # otherwise use the public ACL rules
+  redis_acl_rules = var.redis_add_acl_rule ? (
+    var.redis_vpe_enabled == true && (var.redis_service_endpoints == "private" || var.redis_service_endpoints == "public-and-private") ?
+    local.redis_vpe_acl_rules :
+    local.redis_public_acl_rules
+  ) : []
+
+  # Combine all ACL rules
+  final_acl_rules = concat(var.vpc_acl_rules, local.postgres_acl_rules, local.redis_acl_rules)
 }
 
 locals {
@@ -244,15 +307,22 @@ module "icd_postgres_vpe" {
 
 # attach rules to the VPC default security group to enable traffic from the OCP cluster's workers to the ICD Postgres instance
 # if the VPE gateway to postgres is enabled, restrict access to the subnet CIDRs, otherwise allow from anywhere
+# Only create these rules if a cluster exists
 resource "ibm_is_security_group_rule" "vpc_kubecluster_sg_rule" {
-  for_each = {
+  depends_on = [
+    module.ocp_vpc,
+    module.icd_postgres,
+    time_sleep.wait_before_creating_vpe
+  ]
+  
+  for_each = module.ocp_vpc.kube_cluster_sg != null ? {
     for subnet in module.ocp_vpc.vpc_subnet_zone_list :
     "${subnet.name}_${subnet.zone}" => {
       id   = subnet.id
       zone = subnet.zone
       cidr = subnet.cidr
     }
-  }
+  } : {}
   group     = module.ocp_vpc.vpc_default_security_group
   direction = "inbound"
   local     = var.postgres_vpe_enabled == true ? each.value.cidr : "0.0.0.0/0"
@@ -264,18 +334,177 @@ resource "ibm_is_security_group_rule" "vpc_kubecluster_sg_rule" {
 }
 
 ########################################################################################################################
-# Redis
+# ICD Redis
 ########################################################################################################################
 
-module "redis" {
-  depends_on = [module.ocp_vpc]
-  count      = var.existing_redis_hostname == null ? 1 : 0
-  source     = "./modules/redis"
+module "icd_redis" {
+  source                       = "terraform-ibm-modules/icd-redis/ibm"
+  version                      = "2.3.0"
+  resource_group_id            = var.resource_group_id
+  name                         = var.redis_instance_name
+  redis_version                = var.redis_version
+  region                       = var.region
+  service_endpoints            = var.redis_service_endpoints
+  member_host_flavor           = "multitenant"
+  use_ibm_owned_encryption_key = false
+  kms_key_crn                  = module.key_protect_all_inclusive.keys["terraform-enterprise.terraform-enterprise-redis"].crn
+  service_credential_names = {
+    "tfe-redis" = "Operator"
+  }
+  deletion_protection = var.redis_deletion_protection
 }
 
+# defining ACL rules to allow traffic to/from the ICD Redis instance based on the selected service endpoints and VPE configuration
 locals {
-  redis_host        = var.existing_redis_hostname != null ? var.existing_redis_hostname : module.redis[0].redis_host
-  redis_pass_base64 = var.existing_redis_password_base64 != null ? var.existing_redis_password_base64 : module.redis[0].redis_password_base64
+
+  redis_public_acl_rules = flatten([
+    for subnet, cidr in var.subnets_zones_cidr :
+    concat(
+      [
+        {
+          name        = "allow-redis-outbound-${subnet}"
+          action      = "allow"
+          direction   = "outbound"
+          source      = cidr
+          destination = "0.0.0.0/0"
+          tcp = {
+            source_port_max = 65535
+            source_port_min = 1
+            port_min        = module.icd_redis.port
+            port_max        = module.icd_redis.port
+          }
+        }
+      ],
+      [
+        {
+          name        = "allow-redis-inbound-${subnet}"
+          action      = "allow"
+          direction   = "inbound"
+          source      = "0.0.0.0/0"
+          destination = cidr
+          tcp = {
+            source_port_max = module.icd_redis.port
+            source_port_min = module.icd_redis.port
+            port_max        = 65535
+            port_min        = 1
+          }
+        }
+      ]
+    )
+    ]
+  )
+
+  # ACL rules allowing traffic from/to the subnet CIDRs when VPE is enabled
+  redis_vpe_acl_rules = flatten([
+    for subnet, cidr in var.subnets_zones_cidr : [
+      {
+        name        = "allow-redis-outbound-to-vpe-${subnet}"
+        action      = "allow"
+        direction   = "outbound"
+        source      = cidr
+        destination = cidr
+        tcp = {
+          source_port_max = 65535
+          source_port_min = 1
+          port_min        = module.icd_redis.port
+          port_max        = module.icd_redis.port
+        }
+      },
+      {
+        name        = "allow-redis-inbound-from-vpe-${subnet}"
+        action      = "allow"
+        direction   = "inbound"
+        source      = cidr
+        destination = cidr
+        tcp = {
+          source_port_max = module.icd_redis.port
+          source_port_min = module.icd_redis.port
+          port_max        = 65535
+          port_min        = 1
+        }
+      }
+    ]
+  ])
+
+  redis_host        = var.existing_redis_hostname != null ? var.existing_redis_hostname : (var.redis_vpe_enabled == true && (var.redis_service_endpoints == "public-and-private" || var.redis_service_endpoints == "private") ? data.ibm_database_connection.icd_redis_private_connection[0].rediss[0].hosts[0].hostname : module.icd_redis.hostname)
+  redis_pass_base64 = var.existing_redis_password_base64 != null ? var.existing_redis_password_base64 : base64encode(module.icd_redis.service_credentials_object.credentials["tfe-redis"].password)
+  redis_port        = var.redis_vpe_enabled == true && (var.redis_service_endpoints == "public-and-private" || var.redis_service_endpoints == "private") ? data.ibm_database_connection.icd_redis_private_connection[0].rediss[0].hosts[0].port : module.icd_redis.port
+  
+  # Redis TLS certificate - ICD Redis provides a base64-encoded certificate
+  redis_tls_cert_base64 = var.existing_redis_hostname != null ? null : (
+    var.redis_vpe_enabled == true && (var.redis_service_endpoints == "public-and-private" || var.redis_service_endpoints == "private") ?
+    data.ibm_database_connection.icd_redis_private_connection[0].rediss[0].certificate[0].certificate_base64 :
+    module.icd_redis.certificate_base64
+  )
+}
+
+# in order to avoid to fail as service is not found we need to sleep for 5 minutes before creating the VPE
+resource "time_sleep" "wait_before_creating_redis_vpe" {
+  depends_on      = [module.ocp_vpc]
+  count           = var.redis_vpe_enabled == true ? 1 : 0
+  create_duration = local.sleep_before_creating_vpe
+}
+
+module "icd_redis_vpe" {
+  depends_on = [time_sleep.wait_before_creating_redis_vpe]
+  count      = var.redis_vpe_enabled ? 1 : 0
+  source     = "terraform-ibm-modules/vpe-gateway/ibm"
+  version    = "5.2.0"
+  region     = var.region
+  cloud_service_by_crn = [
+    {
+      crn          = (module.icd_redis.crn)
+      service_name = "redis"
+    }
+  ]
+  service_endpoints = var.redis_vpe_service_endpoints
+  vpc_name          = module.ocp_vpc.vpc_name
+  vpc_id            = module.ocp_vpc.vpc_id
+  subnet_zone_list  = module.ocp_vpc.vpc_subnet_zone_list
+  resource_group_id = var.resource_group_id
+}
+
+# attach rules to the VPC default security group to enable traffic from the OCP cluster's workers to the ICD Redis instance
+# if the VPE gateway to redis is enabled, restrict access to the subnet CIDRs, otherwise allow from anywhere
+# Only create these rules if a cluster exists
+resource "ibm_is_security_group_rule" "vpc_kubecluster_redis_sg_rule" {
+  depends_on = [
+    module.ocp_vpc,
+    module.icd_redis,
+    time_sleep.wait_before_creating_redis_vpe
+  ]
+  
+  for_each = module.ocp_vpc.kube_cluster_sg != null ? {
+    for subnet in module.ocp_vpc.vpc_subnet_zone_list :
+    "${subnet.name}_${subnet.zone}" => {
+      id   = subnet.id
+      zone = subnet.zone
+      cidr = subnet.cidr
+    }
+  } : {}
+  group     = module.ocp_vpc.vpc_default_security_group
+  direction = "inbound"
+  local     = var.redis_vpe_enabled == true ? each.value.cidr : "0.0.0.0/0"
+  remote    = module.ocp_vpc.kube_cluster_sg.id
+  tcp {
+    port_min = module.icd_redis.port
+    port_max = module.icd_redis.port
+  }
+}
+
+# retrieving the private endpoint to redis
+data "ibm_database_connection" "icd_redis_private_connection" {
+  depends_on = [
+    module.icd_redis,
+    module.icd_redis_vpe,
+    time_sleep.wait_before_creating_redis_vpe
+  ]
+  
+  count         = var.redis_vpe_enabled == true && (var.redis_service_endpoints == "public-and-private" || var.redis_service_endpoints == "private") ? 1 : 0
+  endpoint_type = "private"
+  deployment_id = module.icd_redis.id
+  user_id       = module.icd_redis.adminuser
+  user_type     = "database"
 }
 
 ########################################################################################################################
@@ -299,6 +528,12 @@ data "ibm_sm_arbitrary_secret" "tfe_license" {
 
 # retrieving the private endpoint to postgres
 data "ibm_database_connection" "icd_postgres_private_connection" {
+  depends_on = [
+    module.icd_postgres,
+    module.icd_postgres_vpe,
+    time_sleep.wait_before_creating_vpe
+  ]
+  
   count         = var.postgres_vpe_enabled == true && (var.postgres_service_endpoints == "public-and-private" || var.postgres_service_endpoints == "private") ? 1 : 0
   endpoint_type = "private"
   deployment_id = module.icd_postgres.id
@@ -319,13 +554,26 @@ locals {
 }
 
 module "tfe_install" {
-  depends_on                = [module.redis, module.icd_postgres_vpe]
-  source                    = "./modules/tfe-install"
+  count      = 1
+  depends_on = [
+    module.icd_redis,
+    module.icd_postgres,
+    module.icd_postgres_vpe,
+    module.icd_redis_vpe,
+    ibm_is_security_group_rule.vpc_kubecluster_sg_rule,
+    ibm_is_security_group_rule.vpc_kubecluster_redis_sg_rule,
+    time_sleep.wait_before_creating_vpe,
+    time_sleep.wait_before_creating_redis_vpe,
+    data.ibm_database_connection.icd_postgres_private_connection,
+    data.ibm_database_connection.icd_redis_private_connection
+  ]
+  source = "./modules/tfe-install"
   cluster_id                = module.ocp_vpc.cluster_id
   cluster_resource_group_id = var.resource_group_id
   namespace                 = var.tfe_namespace
   tfe_license               = local.tfe_license
   tfe_image_tag             = var.tfe_image_tag
+  helm_chart_version        = var.helm_chart_version
   tfe_database_host         = "${local.icd_postgres_hostname}:${local.icd_postgres_port}"
   tfe_database_user         = module.icd_postgres.service_credentials_object.credentials["tfe"].username
   tfe_database_password     = module.icd_postgres.service_credentials_object.credentials["tfe"].password
@@ -336,8 +584,10 @@ module "tfe_install" {
   tfe_s3_secret_key = module.cos.resource_keys["tfe-credentials"].credentials["cos_hmac_keys.secret_access_key"]
   tfe_s3_endpoint   = module.cos.s3_endpoint_public
 
-  tfe_redis_host     = local.redis_host
-  tfe_redis_password = local.redis_pass_base64
+  tfe_redis_host         = "${local.redis_host}:${local.redis_port}"
+  tfe_redis_password     = local.redis_pass_base64
+  tfe_redis_use_tls      = var.existing_redis_hostname != null ? false : true
+  tfe_redis_tls_cert     = local.redis_tls_cert_base64
 
   admin_username = var.admin_username
   admin_password = var.admin_password
@@ -357,12 +607,12 @@ module "tfe_install" {
 ########################################################################################################################
 
 resource "ibm_cm_account" "cm_account_instance" {
-  count = var.add_to_catalog ? 1 : 0
+  count = var.add_to_catalog && length(module.tfe_install) > 0 ? 1 : 0
   terraform_engines {
     name            = var.terraform_enterprise_engine_name
     type            = "terraform-enterprise"
-    public_endpoint = module.tfe_install.tfe_console_url
-    api_token       = module.tfe_install.token
+    public_endpoint = module.tfe_install[0].tfe_console_url
+    api_token       = module.tfe_install[0].token
     da_creation {
       enabled                    = var.enable_automatic_deployable_architecture_creation
       default_private_catalog_id = var.default_private_catalog_id
@@ -444,7 +694,7 @@ module "tfe_dns_record" {
     {
       type    = "CNAME"
       name    = "${var.tfe_secondary_host}.${var.existing_cis_instance_domain}"
-      content = module.tfe_install.tfe_hostname
+      content = module.tfe_install[0].tfe_hostname
       ttl     = 900
     }
   ]
