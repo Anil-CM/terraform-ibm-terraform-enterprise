@@ -664,3 +664,17 @@ resource "null_resource" "tfe_org" {
     command = "${path.module}/scripts/create_org.sh ${kubernetes_secret_v1.tfe_admin_token.data.token} ${var.tfe_organization} ${var.admin_email} ${data.kubernetes_resource.tfe_route.object.status.ingress[0].host}"
   }
 }
+
+# Validate that TFE is healthy on all expected endpoints after the full deployment
+# is complete (Helm release, admin user, and org creation).
+data "external" "tfe_health_check" {
+  depends_on = [
+    data.external.admin_user_token,
+    null_resource.tfe_org,
+  ]
+  program = [
+    "${path.module}/scripts/validate_tfe_health.sh",
+    data.kubernetes_resource.tfe_route.object.status.ingress[0].host,
+    data.kubernetes_secret_v1.tfe_admin_token.data["token"],
+  ]
+}

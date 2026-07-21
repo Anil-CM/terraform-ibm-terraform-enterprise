@@ -6,6 +6,11 @@ output "tfe_installation_status" {
   value       = helm_release.tfe_install.status
 }
 
+output "tfe_health_status" {
+  description = "Health check result for TFE endpoints (readiness, API ping, authenticated API). Value is 'healthy' when all checks pass."
+  value       = data.external.tfe_health_check.result["status"]
+}
+
 output "tfe_console_url" {
   description = "The URL to access the Terraform Enterprise console"
   value       = "https://${data.kubernetes_resource.tfe_route.object.status.ingress[0].host}"
