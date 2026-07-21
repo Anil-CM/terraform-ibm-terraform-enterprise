@@ -664,3 +664,4 @@ resource "null_resource" "tfe_org" {
     command = "${path.module}/scripts/create_org.sh ${kubernetes_secret_v1.tfe_admin_token.data.token} ${var.tfe_organization} ${var.admin_email} ${data.kubernetes_resource.tfe_route.object.status.ingress[0].host}"
   }
 }
+
