@@ -19,8 +19,8 @@ resource "kubernetes_namespace_v1" "tfe" {
 locals {
   # Extract the registry hostname (everything before the first "/") from the
   # image repository so the pull secret targets the correct registry.
-  # e.g. "images.releases.hashicorp.com/hashicorp/terraform-enterprise" → "images.releases.hashicorp.com"
-  # e.g. "cp.icr.io/cp/hashicorp/terraform-enterprise"                  → "cp.icr.io"
+  # e.g. "images.releases.hashicorp.com"                → "images.releases.hashicorp.com"
+  # e.g. "cp.icr.io/cp"                                 → "cp.icr.io"
   tfe_registry_hostname = split("/", var.tfe_image_repository)[0]
 }
 
@@ -507,8 +507,8 @@ data "kubernetes_service_v1" "router_internal" {
 }
 
 resource "kubectl_manifest" "tfe_host_alias_patch" {
-  depends_on = [helm_release.tfe_install]
-  yaml_body  = <<-YAML
+  depends_on        = [helm_release.tfe_install]
+  yaml_body         = <<-YAML
     apiVersion: apps/v1
     kind: Deployment
     metadata:

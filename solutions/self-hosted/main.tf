@@ -13,8 +13,8 @@ module "resource_group" {
 }
 
 module "tfe" {
-  source            = "../.."
-  region            = var.region
+  source                                   = "../.."
+  region                                   = var.region
   resource_group_id                        = module.resource_group.resource_group_id
   resource_tags                            = var.resource_tags
   existing_cluster_id                      = var.existing_cluster_id
