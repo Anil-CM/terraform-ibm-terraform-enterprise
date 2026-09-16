@@ -53,11 +53,11 @@ This module deploys Terraform Enterprise using the official HashiCorp Helm chart
 ```hcl
 module "terraform_enterprise" {
   source = "terraform-ibm-modules/terraform-enterprise/ibm"
-  
+
   tfe_helm_chart_version = "1.6.3"
   tfe_helm_repository    = "https://helm.releases.hashicorp.com"  # Optional, this is the default
   tfe_image_tag          = "v202506-1"
-  
+
   # ... other required variables
 }
 ```
@@ -86,8 +86,8 @@ Set `prefix = null` or `prefix = ""` to skip prefixing entirely and use the name
 To upgrade Terraform Enterprise to a new version:
 
 1. Check the [Terraform Enterprise release notes](https://developer.hashicorp.com/terraform/enterprise/releases) and the [Helm chart changelog](https://github.com/hashicorp/terraform-enterprise-helm/blob/main/CHANGELOG.md) for the target version.
-2. Update `tfe_image_tag` to the new image version (e.g. `"v202506-1"`).
-3. Update `tfe_helm_chart_version` to the corresponding Helm chart version (e.g. `"1.7.0"`).
+2. Update `tfe_image_tag` to the new image version (e.g. `"2.0.5"`).
+3. Update `tfe_helm_chart_version` to the corresponding Helm chart version (e.g. `"2.0.5"`).
 4. Run `terraform plan` and review the diff — expect a Helm release update only.
 5. Run `terraform apply`. The Helm chart performs a rolling update; existing runs continue until pods are replaced.
 

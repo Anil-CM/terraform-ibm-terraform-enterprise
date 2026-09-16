@@ -507,8 +507,8 @@ data "kubernetes_service_v1" "router_internal" {
 }
 
 resource "kubectl_manifest" "tfe_host_alias_patch" {
-  depends_on = [helm_release.tfe_install]
-  yaml_body  = <<-YAML
+  depends_on        = [helm_release.tfe_install]
+  yaml_body         = <<-YAML
     apiVersion: apps/v1
     kind: Deployment
     metadata:

@@ -349,21 +349,21 @@ locals {
 }
 
 module "tfe_install" {
-  depends_on                = [module.redis, module.icd_postgres_vpe]
-  source                    = "./modules/tfe-install"
-  cluster_id                = module.ocp_vpc.cluster_id
-  cluster_resource_group_id = var.resource_group_id
-  namespace                 = var.tfe_namespace
+  depends_on                     = [module.redis, module.icd_postgres_vpe]
+  source                         = "./modules/tfe-install"
+  cluster_id                     = module.ocp_vpc.cluster_id
+  cluster_resource_group_id      = var.resource_group_id
+  namespace                      = var.tfe_namespace
   tfe_license                    = local.tfe_license
   tfe_encryption_password        = var.tfe_encryption_password
   tfe_image_tag                  = var.tfe_image_tag
   tfe_image_repository           = var.tfe_image_repository
   tfe_image_pull_secret_username = var.tfe_image_pull_secret_username
   tfe_helm_chart_version         = var.tfe_helm_chart_version
-  tfe_helm_repository       = var.tfe_helm_repository
-  tfe_database_host         = "${local.icd_postgres_hostname}:${local.icd_postgres_port}"
-  tfe_database_user         = module.icd_postgres.service_credentials_object.credentials["tfe"].username
-  tfe_database_password     = module.icd_postgres.service_credentials_object.credentials["tfe"].password
+  tfe_helm_repository            = var.tfe_helm_repository
+  tfe_database_host              = "${local.icd_postgres_hostname}:${local.icd_postgres_port}"
+  tfe_database_user              = module.icd_postgres.service_credentials_object.credentials["tfe"].username
+  tfe_database_password          = module.icd_postgres.service_credentials_object.credentials["tfe"].password
 
   tfe_s3_bucket     = module.cos.bucket_name
   tfe_s3_region     = var.region

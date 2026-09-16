@@ -485,6 +485,76 @@
             },
             {
               "key": "tfe_secondary_hostname_secret_name"
+            },
+            {
+              "key": "tfe_encryption_password",
+              "required": true,
+              "virtual": false
+            },
+            {
+              "key": "tfe_image_repository",
+              "required": false,
+              "virtual": false,
+              "default_value": "images.releases.hashicorp.com/hashicorp/terraform-enterprise"
+            },
+            {
+              "key": "tfe_image_pull_secret_username",
+              "required": false,
+              "virtual": false,
+              "default_value": "terraform"
+            },
+            {
+              "key": "tfe_namespace",
+              "required": false,
+              "virtual": false,
+              "default_value": "tfe"
+            },
+            {
+              "key": "tfe_extra_env_vars",
+              "required": false,
+              "virtual": false,
+              "custom_config": {
+                "type": "code_editor",
+                "grouping": "deployment",
+                "original_grouping": "deployment",
+                "config_constraints": {
+                  "supportedLanguages": [
+                    "hcl"
+                  ]
+                }
+              }
+            },
+            {
+              "key": "workers_per_zone",
+              "required": false,
+              "virtual": false,
+              "default_value": 2
+            },
+            {
+              "key": "worker_node_flavor",
+              "required": false,
+              "virtual": false,
+              "default_value": "bx2.4x16"
+            },
+            {
+              "key": "existing_cluster_id",
+              "required": false,
+              "virtual": false
+            },
+            {
+              "key": "existing_vpc_id",
+              "required": false,
+              "virtual": false
+            },
+            {
+              "key": "postgres_deletion_protection",
+              "required": false,
+              "virtual": false
+            },
+            {
+              "key": "redis_deletion_protection",
+              "required": false,
+              "virtual": false
             }
           ],
           "terraform_version": "1.12.2",

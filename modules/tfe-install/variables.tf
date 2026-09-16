@@ -78,13 +78,13 @@ variable "tfe_license" {
 
 # renovate: datasource=github-releases depName=hashicorp/terraform-enterprise
 variable "tfe_image_tag" {
-  description = "The version tag of the Terraform Enterprise image to use (e.g., 'v202504-1'). See https://developer.hashicorp.com/terraform/enterprise/releases for available versions."
+  description = "The version tag of the Terraform Enterprise image to use. Check on https://developer.hashicorp.com/terraform/enterprise/releases for available versions."
   type        = string
   default     = "2.0.5"
 }
 
 variable "tfe_image_repository" {
-  description = "The container image repository to pull the Terraform Enterprise image from. Defaults to HashiCorp's official registry ('images.releases.hashicorp.com/hashicorp/terraform-enterprise'). For IBM Passport Advantage customers, set to 'cp.icr.io/cp/hashicorp/terraform-enterprise' and provide a corresponding entitlement key as the pull secret password."
+  description = "The container image registry to pull the Terraform Enterprise image from. Defaults to HashiCorp's official registry ('images.releases.hashicorp.com/hashicorp/terraform-enterprise'). For IBM Passport Advantage customers, set to 'cp.icr.io/cp/hashicorp/terraform-enterprise' and provide a corresponding entitlement key as the pull secret password."
   type        = string
   default     = "images.releases.hashicorp.com/hashicorp/terraform-enterprise"
   nullable    = false
@@ -99,7 +99,7 @@ variable "tfe_image_pull_secret_username" {
 
 # renovate: datasource=helm depName=terraform-enterprise registryUrl=https://helm.releases.hashicorp.com
 variable "tfe_helm_chart_version" {
-  description = "The version of the Terraform Enterprise Helm chart to use (e.g., '1.6.3'). See https://github.com/hashicorp/terraform-enterprise-helm/blob/main/CHANGELOG.md for available versions."
+  description = "The version of the Terraform Enterprise Helm chart to use. Check on https://github.com/hashicorp/terraform-enterprise-helm/blob/main/CHANGELOG.md for available versions."
   type        = string
   default     = "2.0.5"
 }

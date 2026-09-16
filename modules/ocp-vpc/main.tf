@@ -60,7 +60,7 @@ module "vpc" {
         public_gateway = true
       }
     ]
-  } : {
+    } : {
     # Placeholder to satisfy the schema's zone-1 requirement when
     # create_subnets = false — these values are never used by the module.
     zone-1 = []
@@ -131,16 +131,27 @@ locals {
 }
 
 locals {
-  cluster_security_group = [for group in data.ibm_is_security_groups.vpc_security_groups.security_groups : group if group.name == "kube-${local.cluster_id}"][0]
+  matching_cluster_security_groups = [
+    for group in data.ibm_is_security_groups.vpc_security_groups.security_groups :
+    group if group.name == "kube-${local.cluster_id}"
+  ]
 }
 
 data "ibm_is_security_groups" "vpc_security_groups" {
-  vpc_id = local.vpc_id
+  depends_on = [module.openshift]
+  vpc_id     = local.vpc_id
 }
 
-# Kube-<vpc id> Security Group
+# Kube-<cluster id> Security Group
 data "ibm_is_security_group" "kube_cluster_sg" {
-  name = local.cluster_security_group.name
+  name = local.matching_cluster_security_groups[0].name
+
+  lifecycle {
+    precondition {
+      condition     = length(local.matching_cluster_security_groups) > 0
+      error_message = "Expected security group 'kube-${local.cluster_id}' was not found in VPC ${local.vpc_id}. Ensure the cluster has finished provisioning before this data source is evaluated."
+    }
+  }
 }
 
 data "ibm_is_vpc" "vpc" {

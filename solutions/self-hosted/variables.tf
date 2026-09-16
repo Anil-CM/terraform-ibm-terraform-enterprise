@@ -67,7 +67,7 @@ variable "tfe_encryption_password" {
 
 variable "tfe_image_repository" {
   type        = string
-  description = "The container image repository to pull the Terraform Enterprise image from. Defaults to HashiCorp's official registry ('images.releases.hashicorp.com/hashicorp/terraform-enterprise'). For IBM Passport Advantage customers, set to 'cp.icr.io/cp/hashicorp/terraform-enterprise'."
+  description = "The container image registry to pull the Terraform Enterprise image from. Defaults to HashiCorp's official registry ('images.releases.hashicorp.com/hashicorp/terraform-enterprise'). For IBM Passport Advantage customers, set to 'cp.icr.io/cp/hashicorp/terraform-enterprise'."
   default     = "images.releases.hashicorp.com/hashicorp/terraform-enterprise"
   nullable    = false
 }
@@ -82,7 +82,7 @@ variable "tfe_image_pull_secret_username" {
 # renovate: datasource=github-releases depName=hashicorp/terraform-enterprise
 variable "tfe_image_tag" {
   type        = string
-  description = "The version tag of the Terraform Enterprise image to use (e.g., 'v202504-1'). See https://developer.hashicorp.com/terraform/enterprise/releases for available versions."
+  description = "The version tag of the Terraform Enterprise image to use. Check on https://developer.hashicorp.com/terraform/enterprise/releases for available versions."
   default     = "2.0.5"
 }
 
@@ -539,7 +539,7 @@ variable "workers_per_zone" {
 
 variable "worker_node_flavor" {
   type        = string
-  description = "The VPC machine type for worker nodes (e.g. 'bx2.4x16', 'bx2.8x32', 'bx2.16x64'). See https://cloud.ibm.com/docs/vpc?topic=vpc-profiles for available profiles. Default is 'bx2.4x16'. Ignored when existing_cluster_id is set."
+  description = "The VPC machine type for worker nodes (e.g. 'bx2.4x16', 'bx2.8x32', 'bx2.16x64'). See https://cloud.ibm.com/docs/vpc?topic=vpc-profiles for available profiles. Default is 'bx2.4x16'. Ignored if existing_cluster_id is set."
   default     = "bx2.4x16"
   nullable    = false
 }
@@ -571,4 +571,3 @@ variable "postgres_deletion_protection" {
   description = "Enable deletion protection for the PostgreSQL instance. Set to false to allow terraform destroy. Default is false for self-hosted solution."
   default     = false
 }
-
